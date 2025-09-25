@@ -1,31 +1,16 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "APlayer.h"
+#include "DicePlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/SpotLightComponent.h"
 
 // Sets default values
-AAPlayer::AAPlayer()
+ADicePlayer::ADicePlayer()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
-
-	UE_LOG(LogTemp, Warning, TEXT("Default constructor used for the Player (PlayerID set to 0)"));
-	SetPlayer(0);
-}
-
-AAPlayer::AAPlayer(int32 PlayerID)
-{
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
-	SetPlayer(PlayerID);
-}
-
-void AAPlayer::SetPlayer(int32 NewPlayerID)
-{
-	this->PlayerID = NewPlayerID;
-	this->DiceCount = 5;
+	this->PlayerID = -1;
 
 	// Root
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
@@ -44,15 +29,21 @@ void AAPlayer::SetPlayer(int32 NewPlayerID)
 	PlayerLight->Intensity = 2000.f;
 }
 
+void ADicePlayer::PlayerSetup(int32 NewPlayerID)
+{
+	this->PlayerID = NewPlayerID;
+	this->DiceCount = 5;
+}
+
 // Called when the game starts or when spawned
-void AAPlayer::BeginPlay()
+void ADicePlayer::BeginPlay()
 {
 	Super::BeginPlay();
 	
 }
 
 // Called every frame
-void AAPlayer::Tick(float DeltaTime)
+void ADicePlayer::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 

@@ -4,18 +4,16 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "APlayer.generated.h"
+#include "DicePlayer.generated.h"
 
 UCLASS()
-class DICE_API AAPlayer : public AActor
+class DICE_API ADicePlayer : public AActor
 {
 	GENERATED_BODY()
 	
 public:	
 	// Sets default values for this actor's properties
-	AAPlayer();
-
-	AAPlayer(int32 PlayerID);
+	ADicePlayer();
 
 protected:
 	// Called when the game starts or when spawned
@@ -37,12 +35,11 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	class USpotLightComponent* PlayerLight;
 
+	/* Sets the player */
+	void PlayerSetup(int32 NewPlayerID);
+
 private:
 	/* Player ID */
 	UPROPERTY(VisibleAnywhere, Category = "Player Info")
 	int32 PlayerID;
-
-	/* Sets the player */
-	void SetPlayer(int32 NewPlayerID);
-
 };
