@@ -20,12 +20,16 @@ protected:
 	virtual void BeginPlay() override;
 
 public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
 	/** Current number of die that the player has in play **/
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Gameplay")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Dice")
 	int32 DiceCount;
+
+	/** List of die **/
+	TArray<int32> DiceRolls;
+
+	/** Player class to spawn */
+	UPROPERTY(EditDefaultsOnly, Category = "Dice")
+	TSubclassOf<AActor> DiceClass;
 
 	/** Camera **/
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -42,4 +46,10 @@ private:
 	/* Player ID */
 	UPROPERTY(VisibleAnywhere, Category = "Player Info")
 	int32 PlayerID;
+
+	/* Spawns the dice with random faces */
+	void RollDice();
+
+	/* Generate a random face side*/
+	FRotator GenerateDiceRot(int32 FaceVal);
 };

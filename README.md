@@ -1,3 +1,7 @@
-For the dice randomization, select `Content/levels/demoMap` and press play.
-To randomize dice, press SPACE.
-The logic is in the Level Blueprints.
+# Dice Randomization (`levels/demoMap`)
+* To randomize dice, press SPACE [Level Blueprint]
+
+# Game (`levels/diceMap`)
+* Spawns N players [`BP_DiceGameMode` Details]
+* Player and Game code [`Source/dice`]
+* Switch between players with SPACE [Level Blueprint]
