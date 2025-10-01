@@ -4,7 +4,15 @@
 #include "DicePlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Kismet/GameplayStatics.h"
+#include "Blueprint/UserWidget.h"
 #include "Components/SpotLightComponent.h"
+
+// Called when the game starts or when spawned
+void ADicePlayer::BeginPlay()
+{
+	Super::BeginPlay();
+}
 
 // Sets default values
 ADicePlayer::ADicePlayer()
@@ -35,6 +43,7 @@ void ADicePlayer::PlayerSetup(int32 NewPlayerID)
 	// Set the player ID, and initialize the number of cubes
 	this->PlayerID = NewPlayerID;
 	this->DiceCount = 5;
+	this->bIsPlaying = false;
 
 	// Roll Initial Dice
 	RollDice();
@@ -46,7 +55,7 @@ void ADicePlayer::RollDice()
 	for (int32 DiceIdx = 0; DiceIdx < DiceCount; DiceIdx++)
 	{
 		/* Generate a random dice face */
-		auto Face = FMath::RandRange(1, 6);
+		auto RandomFace = FMath::RandRange(1, 6);
 
 		/* Spawns the Player Actor and sets it up */
 		FVector SpawnLocation = GetActorLocation();
@@ -57,11 +66,11 @@ void ADicePlayer::RollDice()
 		AActor* NewDice = GetWorld()->SpawnActor<AActor>(
 			DiceClass,
 			SpawnLocation,
-			GenerateDiceRot(Face),
+			GenerateDiceRot(RandomFace),
 			Params
 		);
 
-		DiceRolls.Add(Face);
+		DiceRolls.Add(RandomFace);
 	}
 }
 
@@ -84,10 +93,105 @@ FRotator ADicePlayer::GenerateDiceRot(int32 FaceVal)
 	}
 }
 
-// Called when the game starts or when spawned
-void ADicePlayer::BeginPlay()
+void ADicePlayer::StartPlayerTurn()
 {
-	Super::BeginPlay();
-	
+	bIsPlaying = true;
+	Face = 0; // default
+
+	// TODO: Will change for multiplayer
+	APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+
+	if (PlayerController)
+	{
+		EnableInput(PlayerController);
+
+		if (InputComponent)
+		{
+			InputComponent->BindAction("SubmitBet", IE_Pressed, this, &ADicePlayer::SubmitBet);
+			OnOpenBetUI();
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("ADicePlayer: InputComponent is null after EnableInput."));
+		}
+	}
 }
 
+/** Callback to show UI for Bidding **/
+void ADicePlayer::OnOpenBetUI()
+{	
+	// Wait for your turn
+	if (!bIsPlaying) return;
+
+	// Check if the Widget Class was set
+	if (!FaceSelectionWidgetClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("FaceSelectionWidgetClass not set on %s"), *GetName());
+		return;
+	}
+
+	// Check if already open
+	if (!ActiveFaceWidget)
+	{
+		// TODO: Changes for multiplayer
+		APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+		if (!PlayerController) return;
+
+		PlayerController->bShowMouseCursor = true;
+
+		ActiveFaceWidget = CreateWidget<UFaceSelectionWidget>(PlayerController, FaceSelectionWidgetClass);
+		if (ActiveFaceWidget)
+		{
+			ActiveFaceWidget->OnFaceChosen.AddDynamic(this, &ADicePlayer::HandleFaceChosen);
+			ActiveFaceWidget->AddToViewport();
+		}
+	}
+}
+
+void ADicePlayer::HandleFaceChosen(int32 FaceValue)
+{
+	Face = FaceValue;
+}
+
+void ADicePlayer::SubmitBet()
+{
+	if (!ActiveFaceWidget || Face == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Need to make a selection in the UI"));
+		return;
+	}
+
+	// TODO: Verify the bet (dynamically before the player chooses)
+	FBet PlayerBet = FBet(
+		ActiveFaceWidget->NumOfFaces,
+		Face,
+		PlayerID
+	);
+
+	// Submit the bet to the Game Mode
+	ADiceGameMode* GameMode = Cast<ADiceGameMode>(UGameplayStatics::GetGameMode(GetWorld()));
+
+	// Verify the bet
+	bool CorrectBet = GameMode->VerifyBet(PlayerBet);
+	if (!CorrectBet)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, TEXT("Incorrect Bet"));
+		return;
+	}
+
+	// Close the UI
+	OnCloseBetUI();
+	GameMode->SubmitBet(PlayerBet);
+}
+
+void ADicePlayer::OnCloseBetUI()
+{
+	ActiveFaceWidget->RemoveFromParent();
+	ActiveFaceWidget = nullptr;
+
+	// TODO: Changes in multiplayer
+	if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController())
+	{
+		PlayerController->bShowMouseCursor = false;
+	}
+}
