@@ -19,7 +19,7 @@ ADicePlayer::ADicePlayer()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
-	this->PlayerID = -1;
+	PlayerID = -1;
 
 	// Root
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
@@ -41,9 +41,8 @@ ADicePlayer::ADicePlayer()
 void ADicePlayer::PlayerSetup(int32 NewPlayerID)
 {
 	// Set the player ID, and initialize the number of cubes
-	this->PlayerID = NewPlayerID;
-	this->DiceCount = 5;
-	this->bIsPlaying = false;
+	PlayerID = NewPlayerID;
+	bIsPlaying = false;
 
 	// Roll Initial Dice
 	RollDice();
@@ -51,7 +50,17 @@ void ADicePlayer::PlayerSetup(int32 NewPlayerID)
 
 void ADicePlayer::RollDice()
 {
+	// Remove all dice
+	for (AActor* Dice : DiceActors)
+	{
+		if (Dice) Dice->Destroy();
+	}
+
+	// Empty the previous die
+	DiceActors.Empty();
 	DiceRolls.Empty();
+
+	// Spawn the die depending on how many the player has
 	for (int32 DiceIdx = 0; DiceIdx < DiceCount; DiceIdx++)
 	{
 		/* Generate a random dice face */
@@ -71,6 +80,7 @@ void ADicePlayer::RollDice()
 		);
 
 		DiceRolls.Add(RandomFace);
+		DiceActors.Add(NewDice);
 	}
 }
 
@@ -107,13 +117,16 @@ void ADicePlayer::StartPlayerTurn()
 
 		if (InputComponent)
 		{
+			InputComponent->ClearActionBindings();
 			InputComponent->BindAction("SubmitBet", IE_Pressed, this, &ADicePlayer::SubmitBet);
-			OnOpenBetUI();
+			InputComponent->BindAction("Challenge", IE_Pressed, this, &ADicePlayer::ChallengeBet);
 		}
 		else
 		{
 			UE_LOG(LogTemp, Warning, TEXT("ADicePlayer: InputComponent is null after EnableInput."));
 		}
+
+		OnOpenBetUI();
 	}
 }
 
@@ -151,6 +164,13 @@ void ADicePlayer::OnOpenBetUI()
 void ADicePlayer::HandleFaceChosen(int32 FaceValue)
 {
 	Face = FaceValue;
+}
+
+void ADicePlayer::ChallengeBet()
+{
+	// Submit the challenge to the Game Mode
+	ADiceGameMode* GameMode = Cast<ADiceGameMode>(UGameplayStatics::GetGameMode(GetWorld()));
+	GameMode->SubmitChallenge(PlayerID);
 }
 
 void ADicePlayer::SubmitBet()

@@ -72,7 +72,7 @@ public:
 	bool VerifyBet(FBet& NewBet);
 
 	/* Submit a challenge from a player */
-	void SubmitChallenge(int32 PlayerIdx);
+	void SubmitChallenge(int32 ChallengerIdx);
 
 private:	
 	/** Current Player **/
@@ -84,10 +84,14 @@ private:
 	/** List of Players **/
 	TArray<ADicePlayer*> Players;
 
-	/* Active Face UI widget */
+	/** Active Face UI widget **/
 	UBetWidget* BetWidget = nullptr;
 
 	/** Toggles the next player in the line **/
 	UFUNCTION(BlueprintCallable)
-	void ToggleNextPlayer(int32 PlayerIdx = -1, bool Overwrite = false);
+	void ToggleNextPlayer(int32 PlayerIdx = -1, bool Overwrite = false, float BlendSpeed = .5f);
+
+	/** End Game Logic **/
+	UFUNCTION()
+	void CheckEndGame();
 };

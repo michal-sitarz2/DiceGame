@@ -24,15 +24,22 @@ protected:
 	/** Callbacks to open or close UI for Bidding **/
 	void OnOpenBetUI();
 	void OnCloseBetUI();
+
+	/** Callbacks for Player Actions **/
 	void SubmitBet();
+	void ChallengeBet();
 
 public:	
 	/** Current number of die that the player has in play **/
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Dice")
-	int32 DiceCount;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Dice")
+	int32 DiceCount = 5;
 
-	/** List of die **/
+	/** List of die faces **/
 	TArray<int32> DiceRolls;
+
+	/* Player ID */
+	UPROPERTY(VisibleAnywhere, Category = "Player Info")
+	int32 PlayerID;
 
 	/** Player class to spawn */
 	UPROPERTY(EditDefaultsOnly, Category = "Dice")
@@ -56,13 +63,12 @@ public:
 	/** Sets the player as the current player **/
 	void StartPlayerTurn();
 
-private:
 	/* Spawns the dice with random faces */
 	void RollDice();
 
-	/* Player ID */
-	UPROPERTY(VisibleAnywhere, Category = "Player Info")
-	int32 PlayerID;
+private:
+	/** List of die actors **/
+	TArray<AActor*> DiceActors;
 
 	/* Currently playing */
 	bool bIsPlaying;

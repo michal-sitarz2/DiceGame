@@ -66,6 +66,58 @@ void ADiceGameMode::BeginPlay()
 	}
 }
 
+void ADiceGameMode::SubmitChallenge(int32 ChallengerIdx)
+{
+	if (!CurrentBet) 
+	{
+		// Debug message
+		GEngine->AddOnScreenDebugMessage(-1, 2.5f, FColor::Red, TEXT("No bet to challenge!"));
+		return;
+	}
+
+	// Increment the counter of dice faces
+	int32 Counter = 0;
+	int32 CheckFace = CurrentBet->Face;
+	for (ADicePlayer* Player : Players)
+	{
+		for (int32 DiceFace : Player->DiceRolls)
+		{
+			// TODO: JOKER variant
+			if (DiceFace == CheckFace)
+			{
+				Counter++;
+			}
+		}
+	}
+
+	int32 PredNumFaces = CurrentBet->NumFaces;
+
+	// Player that made the bet lost if predicted too many faces, otherwise challenger loses
+	int32 LoserIdx = PredNumFaces > Counter ? CurrentBet->PlayerIdx : ChallengerIdx;
+	
+	// Debug message
+	GEngine->AddOnScreenDebugMessage(-1, 2.5f, FColor::Red, FString::Printf(TEXT("Player %d lost the round"), LoserIdx));
+
+	// Decrease the number of die the losing player has
+	Players[LoserIdx]->DiceCount--;
+
+
+	// Reroll all the player dice
+	// TODO: Deal with a player that has zero dice? 
+	// in theory should not roll any dice and toggle should skip them
+	for (ADicePlayer* Player : Players)
+	{
+		Player->RollDice();
+	}
+
+	// Reset the current bet
+	CurrentBet = nullptr;
+	BetWidget->ResetCurrentBetText();
+
+	// Switch to player who lost
+	ToggleNextPlayer(LoserIdx, true, 1.f);
+}
+
 void ADiceGameMode::SubmitBet(FBet& PlayerBet)
 {
 	int32 NumFaces = PlayerBet.NumFaces;
@@ -74,10 +126,9 @@ void ADiceGameMode::SubmitBet(FBet& PlayerBet)
 
 	CurrentBet = new FBet(NumFaces, Face, PlayerIdx);
 
-	BetWidget->SetCurrentBetText(PlayerBet.NumFaces, PlayerBet.Face, PlayerBet.PlayerIdx);
+	BetWidget->SetCurrentBetText(NumFaces, Face, PlayerIdx);
 	ToggleNextPlayer();
 }
-
 
 /*** 
 Current variant : 
@@ -107,19 +158,16 @@ bool ADiceGameMode::VerifyBet(FBet& NewBet)
 	return false;
 }
 
-void ADiceGameMode::SubmitChallenge(int32 PlayerIdx)
-{
-	UE_LOG(LogTemp, Warning, TEXT("Received a challenge!"))
-}
-
 // TODO: will have to decide based on winners/losers, and changes in multiplayer
-void ADiceGameMode::ToggleNextPlayer(int32 PlayerIdx, bool Overwrite)
+void ADiceGameMode::ToggleNextPlayer(int32 PlayerIdx, bool Overwrite, float BlendSpeed)
 {
+	CheckEndGame();
+
 	if (Overwrite) // Sets the player that was passed
 	{
 		CurrentPlayer = PlayerIdx;
 	}
-	else // Set the next available player
+	if (!Overwrite || Players[CurrentPlayer]->DiceCount == 0) // Set the next available player
 	{
 		while (true)
 		{
@@ -138,11 +186,35 @@ void ADiceGameMode::ToggleNextPlayer(int32 PlayerIdx, bool Overwrite)
 	if (PlayerController)
 	{
 		// Sets the current camera to the player
-		PlayerController->SetViewTargetWithBlend(Players[CurrentPlayer], .5f);
+		PlayerController->SetViewTargetWithBlend(Players[CurrentPlayer], BlendSpeed);
 	}
 	else
 	{
 		UE_LOG(LogTemp, Error, TEXT("No Player Controller!"));
 		return;
 	}	
+}
+
+void ADiceGameMode::CheckEndGame()
+{
+	TArray<int> InPlay;
+	for (ADicePlayer* Player : Players)
+	{
+		if (Player->DiceCount > 0)
+		{
+			InPlay.Add(Player->PlayerID);
+		}
+
+		if (InPlay.Num() > 1) return; // More than one player in play
+	}
+
+	if (InPlay.Num() == 1)
+	{
+		// Debug message
+		GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Green, FString::Printf(TEXT("Winner: %d"), InPlay[0]));
+
+		// TODO: Differs for multiplayer
+		APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+		PlayerController->SetPause(true);
+	}
 }
