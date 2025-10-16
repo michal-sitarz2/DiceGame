@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/Slider.h"
 #include "Components/TextBlock.h"
 #include "FaceSelectionWidget.generated.h"
 
@@ -15,23 +16,28 @@ class DICE_API UFaceSelectionWidget : public UUserWidget
 	GENERATED_BODY()
 	
 public:
+	virtual void NativeConstruct() override;
+
 	/** Event Dispatcher for a face number selected**/
 	UPROPERTY(BlueprintAssignable, BlueprintCallable, Category = "Events")
 	FOnFaceChosen OnFaceChosen;
 
-	/** Number of faces selected **/
-	int32 NumOfFaces = 1;
+	// Setups the slider dynamically
+	void SetupSlider(float InMin, float InMax, float InInitialValue = 0.0f);
 
-	UFUNCTION(BlueprintCallable, Category = "Widget")
-	void DecFacesNum();
-
-	UFUNCTION(BlueprintCallable, Category = "Widget")
-	void IncFacesNum();
+	int NumOfFaces;
 
 protected:
 	UPROPERTY(meta = (BindWidget))
-	class UTextBlock* FaceNumTextBlock;
+	class USlider* PredSlider;
+
+	UPROPERTY(meta = (BindWidget))
+	class UTextBlock* PredText;
 
 private:
-	void SetFaceNumBlockText();
+	UFUNCTION()
+	void OnSliderValueChanged(float Value);
+
+	float MinValue;
+	float MaxValue;
 };

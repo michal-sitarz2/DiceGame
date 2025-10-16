@@ -99,8 +99,7 @@ void ADiceGameMode::SubmitChallenge(int32 ChallengerIdx)
 	GEngine->AddOnScreenDebugMessage(-1, 2.5f, FColor::Red, FString::Printf(TEXT("Player %d lost the round"), LoserIdx));
 
 	// Decrease the number of die the losing player has
-	Players[LoserIdx]->DiceCount--;
-
+	Players[LoserIdx]->RemoveDice();
 
 	// Reroll all the player dice
 	// TODO: Deal with a player that has zero dice? 
@@ -167,13 +166,13 @@ void ADiceGameMode::ToggleNextPlayer(int32 PlayerIdx, bool Overwrite, float Blen
 	{
 		CurrentPlayer = PlayerIdx;
 	}
-	if (!Overwrite || Players[CurrentPlayer]->DiceCount == 0) // Set the next available player
+	if (!Overwrite || Players[CurrentPlayer]->DiceRolls.Num() == 0) // Set the next available player
 	{
 		while (true)
 		{
 			CurrentPlayer = (CurrentPlayer + 1) % Players.Num();
 			ADicePlayer* Player = Players[CurrentPlayer];
-			if (Player->DiceCount != 0) break; // Skip players with zero dice
+			if (Player->DiceRolls.Num() != 0) break; // Skip players with zero dice
 		}
 
 	}
@@ -195,12 +194,36 @@ void ADiceGameMode::ToggleNextPlayer(int32 PlayerIdx, bool Overwrite, float Blen
 	}	
 }
 
+// TODO: Set min based on the clicked value
+void ADiceGameMode::SetSlider(UFaceSelectionWidget* FaceWidget)
+{
+	// Set the maximum slider value to total number of dice
+	int TotalDiceNum = 0;
+	for (ADicePlayer* Player : Players)
+	{
+		TotalDiceNum += Player->DiceRolls.Num();
+	}
+
+	FaceWidget->SetupSlider(1.f, TotalDiceNum, 1.f);
+}
+
+bool ADiceGameMode::ReadyToPlay()
+{
+	bool bIsReady = true;
+	for (ADicePlayer* Player : Players)
+	{
+		bIsReady &= Player->bHasSettled;
+	}
+
+	return bIsReady;
+}
+
 void ADiceGameMode::CheckEndGame()
 {
 	TArray<int> InPlay;
 	for (ADicePlayer* Player : Players)
 	{
-		if (Player->DiceCount > 0)
+		if (Player->DiceRolls.Num() > 0)
 		{
 			InPlay.Add(Player->PlayerID);
 		}

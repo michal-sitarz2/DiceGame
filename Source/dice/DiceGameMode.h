@@ -8,6 +8,7 @@
 #include "DiceGameMode.generated.h"
 
 class ADicePlayer;
+class UFaceSelectionWidget;
 
 USTRUCT(BlueprintType)
 struct FBet
@@ -73,6 +74,12 @@ public:
 
 	/* Submit a challenge from a player */
 	void SubmitChallenge(int32 ChallengerIdx);
+
+	/* Checks if all players are ready */
+	bool ReadyToPlay();
+
+	/* Sets up the Face Selection slider with the dynamic bounds */
+	void SetSlider(UFaceSelectionWidget* FaceWidget);
 
 private:	
 	/** Current Player **/

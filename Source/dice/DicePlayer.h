@@ -17,6 +17,8 @@ public:
 	// Sets default values for this actor's properties
 	ADicePlayer();
 
+	virtual void Tick(float DeltaTime) override;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -32,10 +34,13 @@ protected:
 public:	
 	/** Current number of die that the player has in play **/
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Dice")
-	int32 DiceCount = 5;
+	int32 InitDiceCount = 5; 
 
 	/** List of die faces **/
-	TArray<int32> DiceRolls;
+	TArray<int32> DiceRolls; // TODO: Should use a dictionary that matches the AActor to its value, rather than two arrays
+	
+	/* Checks whether the dice are settled */
+	bool bHasSettled;
 
 	/* Player ID */
 	UPROPERTY(VisibleAnywhere, Category = "Player Info")
@@ -49,14 +54,6 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UFaceSelectionWidget> FaceSelectionWidgetClass;
 
-	/** Camera **/
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	class UCameraComponent* PlayerCamera;
-
-	/** Light **/
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	class USpotLightComponent* PlayerLight;
-
 	/* Sets the player */
 	void PlayerSetup(int32 NewPlayerID);
 
@@ -66,12 +63,26 @@ public:
 	/* Spawns the dice with random faces */
 	void RollDice();
 
+	/* Destroys a Dice */
+	void RemoveDice();
+
 private:
+	TMap<FVector, int32> DiceDirectionsMap;
+
 	/** List of die actors **/
 	TArray<AActor*> DiceActors;
 
+	/* Game Mode for the game */
+	ADiceGameMode* GameMode = nullptr;
+
 	/* Currently playing */
 	bool bIsPlaying;
+
+	/* Waiting for the dice to settle? */
+	bool bIsWaiting;
+
+	/* Keeps track how long the dice have been stationary for */
+	float TimeStationary;
 
 	/* Selected Face Number */
 	int32 Face;
@@ -85,5 +96,25 @@ private:
 	/* Deals with Event Dispatcher from Face Selection UI*/
 	UFUNCTION()
 	void HandleFaceChosen(int32 FaceValue);
+
+	/** Camera **/
+	UPROPERTY(VisibleAnywhere)
+	class UCameraComponent* PlayerCamera;
+
+	/** Light **/
+	UPROPERTY(VisibleAnywhere)
+	class USpotLightComponent* PlayerLight;
+
+	/* Check if the dice is within bounds */
+	bool IsWithinBounds(AActor* Dice) const;
+
+	/* Check the top face */
+	void SaveFaces();
+
+	/* Spawn the dice actor */
+	void SpawnDice();
+
+	/* Physically Roll a dice actor */
+	void RollOneDice(AActor* Dice);
 
 };

@@ -3,23 +3,40 @@
 
 #include "FaceSelectionWidget.h"
 
-void UFaceSelectionWidget::SetFaceNumBlockText()
+void UFaceSelectionWidget::NativeConstruct()
 {
-    const FText& Text = FText::FromString(FString::Printf(TEXT("%d"), NumOfFaces));
-    if (FaceNumTextBlock)
+    Super::NativeConstruct();
+
+    if (PredSlider)
     {
-        FaceNumTextBlock->SetText(Text);
+        // Bind the callback for when the slider changes
+        PredSlider->OnValueChanged.AddDynamic(this, &UFaceSelectionWidget::OnSliderValueChanged);
     }
 }
 
-void UFaceSelectionWidget::DecFacesNum()
+
+void UFaceSelectionWidget::SetupSlider(float InMin, float InMax, float InInitialValue)
 {
-    NumOfFaces = FMath::Max(1, NumOfFaces - 1);
-    SetFaceNumBlockText();
+    MinValue = InMin;
+    MaxValue = InMax;
+
+    if (PredSlider)
+    {
+        PredSlider->SetMinValue(MinValue);
+        PredSlider->SetMaxValue(MaxValue);
+        PredSlider->SetValue(InInitialValue);
+    }
+
+    OnSliderValueChanged(InInitialValue);
 }
 
-void UFaceSelectionWidget::IncFacesNum()
+void UFaceSelectionWidget::OnSliderValueChanged(float Value)
 {
-    NumOfFaces++;
-    SetFaceNumBlockText();
+    if (PredText)
+    {
+        FString ValueString = FString::Printf(TEXT("%d"), (int) Value);
+        PredText->SetText(FText::FromString(ValueString));
+    }
+
+    NumOfFaces = (int) Value;
 }
