@@ -78,8 +78,9 @@ public:
 	/* Checks if all players are ready */
 	bool ReadyToPlay();
 
-	/* Sets up the Face Selection slider with the dynamic bounds */
-	void SetSlider(UFaceSelectionWidget* FaceWidget);
+	// TODO:
+	/* Reveal information about the other players */
+	void RevealLeaderboard(TMap<int32, TArray<int32>>& Leaderboard, bool Full);
 
 private:	
 	/** Current Player **/

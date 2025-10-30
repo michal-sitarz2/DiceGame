@@ -3,8 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "DiceTextureData.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/TextBlock.h"
+#include "Components/Image.h"
 #include "BetWidget.generated.h"
 
 UCLASS()
@@ -19,8 +21,28 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Widget")
 	void ResetCurrentBetText();
 
+	void ChallengeStart();
+
 protected:
 	UPROPERTY(meta = (BindWidget))
-	class UTextBlock* BetText;
+	class UTextBlock* PlayerText;
+
+	UPROPERTY(meta = (BindWidget))
+	class UTextBlock* BetNumText;
+
+	UPROPERTY(meta = (BindWidget))
+	class UImage* DiceIcon;
+
+	UPROPERTY(meta = (BindWidget))
+	class UImage* NoneText;
+
+	UPROPERTY(meta = (BindWidget))
+	class UImage* ChallengePopUp;
+
+private:
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	UDiceTextureData* DiceTexturesData;
+
+	void ChallengeStop();
 };
 

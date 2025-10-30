@@ -141,8 +141,22 @@ void ADicePlayer::Tick(float DeltaTime)
 	{
 		if (GameMode->ReadyToPlay())
 		{
+			/* The current player can play */
 			ActiveFaceWidget->SetIsEnabled(true);
 			bIsWaiting = false;
+
+			/* Update the leaderboard with the revealed current dice */
+			TArray<int32> SortedDiceRolls = DiceRolls;
+			SortedDiceRolls.Sort();
+			
+			int DiceIdx = 0;
+			for (int32 DiceRoll : SortedDiceRolls)
+			{
+				Leaderboard[PlayerID][DiceIdx] = DiceRoll;
+				DiceIdx++;
+			}
+
+			ActiveLeaderWidget->UpdateLeaderboard(Leaderboard, PlayerID);
 		}
 	}
 }
@@ -164,6 +178,9 @@ void ADicePlayer::RemoveDice()
 
 	// Destroy the dice
 	LastActor->Destroy();
+
+	// Reinitialize all rolls to zero
+	DiceRolls.Init(0, DiceRolls.Num());
 }
 
 bool ADicePlayer::IsWithinBounds(AActor* Dice) const
@@ -226,6 +243,7 @@ void ADicePlayer::SaveFaces()
 		if (ReRoll)
 		{
 			bHasSettled = false;
+			FaceValue = 0;
 			RollOneDice(Dice);
 		}
 		
@@ -267,7 +285,7 @@ void ADicePlayer::SpawnDice()
 			Params
 		);
 
-		DiceRolls.Add(RandomFace);
+		DiceRolls.Add(0);
 		DiceActors.Add(NewDice);
 	}
 }
@@ -363,45 +381,51 @@ void ADicePlayer::OnOpenBetUI()
 	if (!bIsPlaying) return;
 
 	// Check if the Widget Class was set
-	if (!FaceSelectionWidgetClass)
+	if (!FaceSelectionWidgetClass || !LeaderboardWidgetClass)
 	{
-		UE_LOG(LogTemp, Error, TEXT("FaceSelectionWidgetClass not set on %s"), *GetName());
+		UE_LOG(LogTemp, Error, TEXT("Widget class not set on %s"), *GetName());
 		return;
 	}
 
+	// TODO: Changes for multiplayer
+	APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+	if (!PlayerController) return;
+
+	PlayerController->bShowMouseCursor = true;
+
 	// Check if already open
-	if (!ActiveFaceWidget)
-	{
-		// TODO: Changes for multiplayer
-		APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
-		if (!PlayerController) return;
-
-		PlayerController->bShowMouseCursor = true;
-
-		ActiveFaceWidget = CreateWidget<UFaceSelectionWidget>(PlayerController, FaceSelectionWidgetClass);
-		GameMode->SetSlider(ActiveFaceWidget);
-		
-		if (ActiveFaceWidget)
-		{
-			ActiveFaceWidget->OnFaceChosen.AddDynamic(this, &ADicePlayer::HandleFaceChosen);
-			ActiveFaceWidget->AddToViewport();
-
-			ActiveFaceWidget->SetIsEnabled(false); // Currently disabled until all the player dice have settled
-			bIsWaiting = true;
-		}
-	}
+	ActiveFaceWidget = CreateWidget<UFaceSelectionWidget>(PlayerController, FaceSelectionWidgetClass);
+	SetupUI();
 }
 
 void ADicePlayer::HandleFaceChosen(int32 FaceValue)
 {
+	// TODO: Make Highlight prettier
+	for (int DiceIdx = 0; DiceIdx < DiceActors.Num(); DiceIdx++)
+	{
+		float StencilVal = (FaceValue == DiceRolls[DiceIdx]) ? 2.f : 1.f;
+
+		UStaticMeshComponent* MeshComp = DiceActors[DiceIdx]->FindComponentByClass<UStaticMeshComponent>();
+		MeshComp->SetCustomDepthStencilValue(StencilVal);
+	}
+
 	Face = FaceValue;
+}
+
+void ADicePlayer::OnTurnEnd()
+{
+	// TODO: Release and disable UI Buttons
+
+	// Removes the dice highlights
+	for (int DiceIdx = 0; DiceIdx < DiceActors.Num(); DiceIdx++)
+	{
+		UStaticMeshComponent* MeshComp = DiceActors[DiceIdx]->FindComponentByClass<UStaticMeshComponent>();
+		MeshComp->SetCustomDepthStencilValue(1.f);
+	}
 }
 
 void ADicePlayer::ChallengeBet()
 {
-	// Close the UI
-	OnCloseBetUI();
-
 	// Submit the challenge to the Game Mode
 	GameMode->SubmitChallenge(PlayerID);
 }
@@ -437,14 +461,60 @@ void ADicePlayer::SubmitBet()
 	GameMode->SubmitBet(PlayerBet);
 }
 
+void ADicePlayer::SetupUI()
+{
+	if (!ActiveFaceWidget) return;
+	
+	// TODO: Changes for multiplayer
+	APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+	if (!PlayerController) return;
+
+	// Leaderboard setup (changes when dice are rolled)
+	GameMode->RevealLeaderboard(Leaderboard, false);
+	ActiveLeaderWidget = CreateWidget<ULeaderboardWidget>(PlayerController, LeaderboardWidgetClass);
+	ActiveLeaderWidget->SetupLeaderboard(Leaderboard, PlayerID);
+	ActiveLeaderWidget->AddToViewport();
+
+	// TODO: Set the minimum dynamically when pressed on the buttons, and disable the buttons which the player can't select
+	/* Set up the UI slider */
+	int TotalDiceNum = 0;
+	for (const TPair<int32, TArray<int32>>& Elem : Leaderboard)
+	{
+		for (int32 Val : Elem.Value)
+		{
+			if (Val >= 0) TotalDiceNum++;
+		}
+	}
+
+	// Set the maximum slider value to total number of dice
+	ActiveFaceWidget->SetupSlider(1.f, TotalDiceNum, 1.f);
+
+	/* Event Callback for Selecting a Face Button*/
+	ActiveFaceWidget->OnFaceChosen.AddDynamic(this, &ADicePlayer::HandleFaceChosen);
+	
+	ActiveFaceWidget->AddToViewport(); // Add to player's viewport
+	ActiveFaceWidget->SetIsEnabled(false); // Disable at the start, until all the dice have settled
+	bIsWaiting = true; // Waiting to play 
+}
+
+void ADicePlayer::RevealLeaderboard()
+{
+	GameMode->RevealLeaderboard(Leaderboard, true);
+	ActiveLeaderWidget->UpdateLeaderboard(Leaderboard, PlayerID);
+}
+
 void ADicePlayer::OnCloseBetUI()
 {
-	ActiveFaceWidget->RemoveFromParent();
+	if (ActiveFaceWidget) ActiveFaceWidget->RemoveFromParent();
+	if (ActiveLeaderWidget) ActiveLeaderWidget->RemoveFromParent();
 	ActiveFaceWidget = nullptr;
+	ActiveLeaderWidget = nullptr;
 
 	// TODO: Changes in multiplayer
 	if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController())
 	{
 		PlayerController->bShowMouseCursor = false;
 	}
+
+	OnTurnEnd();
 }

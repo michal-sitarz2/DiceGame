@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "FaceSelectionWidget.h"
+#include "Blueprint/WidgetTree.h"
 
 void UFaceSelectionWidget::NativeConstruct()
 {
@@ -13,7 +13,6 @@ void UFaceSelectionWidget::NativeConstruct()
         PredSlider->OnValueChanged.AddDynamic(this, &UFaceSelectionWidget::OnSliderValueChanged);
     }
 }
-
 
 void UFaceSelectionWidget::SetupSlider(float InMin, float InMax, float InInitialValue)
 {

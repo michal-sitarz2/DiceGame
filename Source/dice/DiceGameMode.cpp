@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerController.h"
 
 
@@ -15,7 +16,7 @@ void ADiceGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// TODO: If InitPlayerNum == 0, Unreal will crush
+	// TODO - Multiplayer: If InitPlayerNum == 0, Unreal will crush
 	if (InitPlayerNum < 2) UE_LOG(LogTemp, Error, TEXT("Not enough players (min 2)"));
 
 	if (!PlayerClass)
@@ -83,10 +84,7 @@ void ADiceGameMode::SubmitChallenge(int32 ChallengerIdx)
 		for (int32 DiceFace : Player->DiceRolls)
 		{
 			// TODO: JOKER variant
-			if (DiceFace == CheckFace)
-			{
-				Counter++;
-			}
+			if (DiceFace == CheckFace) Counter++;
 		}
 	}
 
@@ -98,12 +96,20 @@ void ADiceGameMode::SubmitChallenge(int32 ChallengerIdx)
 	// Debug message
 	GEngine->AddOnScreenDebugMessage(-1, 2.5f, FColor::Red, FString::Printf(TEXT("Player %d lost the round"), LoserIdx));
 
+	////////////////////////////////////////////////////
+	// TODO: Animation
+	Players[ChallengerIdx]->RevealLeaderboard();
+	BetWidget->ChallengeStart();
+
+	// TODO: Multiplayer Close the UI
+	Players[ChallengerIdx]->OnCloseBetUI();
+	//////////////////////////////////////////////////////
+
+
 	// Decrease the number of die the losing player has
 	Players[LoserIdx]->RemoveDice();
 
 	// Reroll all the player dice
-	// TODO: Deal with a player that has zero dice? 
-	// in theory should not roll any dice and toggle should skip them
 	for (ADicePlayer* Player : Players)
 	{
 		Player->RollDice();
@@ -194,19 +200,6 @@ void ADiceGameMode::ToggleNextPlayer(int32 PlayerIdx, bool Overwrite, float Blen
 	}	
 }
 
-// TODO: Set min based on the clicked value
-void ADiceGameMode::SetSlider(UFaceSelectionWidget* FaceWidget)
-{
-	// Set the maximum slider value to total number of dice
-	int TotalDiceNum = 0;
-	for (ADicePlayer* Player : Players)
-	{
-		TotalDiceNum += Player->DiceRolls.Num();
-	}
-
-	FaceWidget->SetupSlider(1.f, TotalDiceNum, 1.f);
-}
-
 bool ADiceGameMode::ReadyToPlay()
 {
 	bool bIsReady = true;
@@ -218,6 +211,7 @@ bool ADiceGameMode::ReadyToPlay()
 	return bIsReady;
 }
 
+// TODO:
 void ADiceGameMode::CheckEndGame()
 {
 	TArray<int> InPlay;
@@ -239,5 +233,30 @@ void ADiceGameMode::CheckEndGame()
 		// TODO: Differs for multiplayer
 		APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
 		PlayerController->SetPause(true);
+	}
+}
+
+void ADiceGameMode::RevealLeaderboard(TMap<int32, TArray<int32>>& Leaderboard, bool Full)
+{
+	Leaderboard.Empty();
+
+	for (ADicePlayer* Player : Players)
+	{
+		Leaderboard.Add(Player->PlayerID, { -1,-1,-1,-1,-1 }); // default: no texture
+		
+		// TODO: Sort the dice rolls
+
+		int32 Count = 0;
+
+		/* Update the leaderboard with the revealed current dice */
+		TArray<int32> SortedDiceRolls = Player->DiceRolls;
+		SortedDiceRolls.Sort();
+
+		for (int32 Dice : SortedDiceRolls)
+		{
+			// Black texture (0) if no reveal, else we save the face number
+			Leaderboard[Player->PlayerID][Count] = Full ? Dice : 0;
+			Count++;
+		}
 	}
 }

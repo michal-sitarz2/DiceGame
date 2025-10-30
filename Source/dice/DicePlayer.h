@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "FaceSelectionWidget.h"
+#include "LeaderboardWidget.h"
 #include "DiceGameMode.h"
 #include "DicePlayer.generated.h"
 
@@ -22,10 +23,6 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-
-	/** Callbacks to open or close UI for Bidding **/
-	void OnOpenBetUI();
-	void OnCloseBetUI();
 
 	/** Callbacks for Player Actions **/
 	void SubmitBet();
@@ -50,9 +47,12 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Dice")
 	TSubclassOf<AActor> DiceClass;
 
-	/** Widget for Face Selection **/
+	/** Widget classes **/
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UFaceSelectionWidget> FaceSelectionWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<ULeaderboardWidget> LeaderboardWidgetClass;
 
 	/* Sets the player */
 	void PlayerSetup(int32 NewPlayerID);
@@ -66,11 +66,23 @@ public:
 	/* Destroys a Dice */
 	void RemoveDice();
 
+	/* Reveals the Leaderboard */
+	void RevealLeaderboard();
+
+	// TODO: Multiplayer -> Protected
+	/** Callbacks to open or close UI for Bidding **/
+	void OnOpenBetUI();
+	void OnCloseBetUI();
+	void SetupUI();
+
 private:
 	TMap<FVector, int32> DiceDirectionsMap;
 
 	/** List of die actors **/
 	TArray<AActor*> DiceActors;
+
+	/* Leaderboard */
+	TMap<int32, TArray<int32>> Leaderboard;
 
 	/* Game Mode for the game */
 	ADiceGameMode* GameMode = nullptr;
@@ -92,6 +104,9 @@ private:
 
 	/* Active Face UI widget */
 	UFaceSelectionWidget* ActiveFaceWidget = nullptr;
+
+	/* Active Leaderboard widget */
+	ULeaderboardWidget* ActiveLeaderWidget = nullptr;
 
 	/* Deals with Event Dispatcher from Face Selection UI*/
 	UFUNCTION()
@@ -116,5 +131,8 @@ private:
 
 	/* Physically Roll a dice actor */
 	void RollOneDice(AActor* Dice);
+
+	/* End of the turn for the player */
+	void OnTurnEnd();
 
 };
