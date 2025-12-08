@@ -10,7 +10,11 @@
 #include "GameFramework/PlayerController.h"
 
 
-ADiceGameMode::ADiceGameMode() {}
+ADiceGameMode::ADiceGameMode() 
+{
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = true;
+}
 
 void ADiceGameMode::BeginPlay()
 {
@@ -28,6 +32,8 @@ void ADiceGameMode::BeginPlay()
 	UWorld* World = GetWorld();
 	if (!World) return;
 
+	ChallengerIdx = -1;
+	LoserIdx = -1;
 
 	/** Spawn all of the players **/
 	for (int32 PlayerID = 0; PlayerID < InitPlayerNum; PlayerID++)
@@ -65,9 +71,72 @@ void ADiceGameMode::BeginPlay()
 		BetWidget->AddToViewport();
 		BetWidget->ResetCurrentBetText();
 	}
+
+	ResetChallengeAnimFlags();
 }
 
-void ADiceGameMode::SubmitChallenge(int32 ChallengerIdx)
+void ADiceGameMode::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (AnimChallengeState == EAnimState::Finished && AnimCountingState == EAnimState::NotStarted)
+	{ 
+		// TODO: Multiplayer
+		// TODO: FVector(0,0)
+		Players[CurrentPlayer]->StartCountingAnim(CurrentCorrectBets, AnimCountingState, BetWidget, CurrentBet->NumFaces);
+
+	}
+
+	if (AnimCountingState == EAnimState::Finished && AnimDestructionState == EAnimState::NotStarted)
+	{
+		// Remove Loser's Dice
+		Players[LoserIdx]->RemoveDice(AnimDestructionState);
+
+		// TODO: Multiplayer - update UI
+		Players[CurrentPlayer]->RemoveDiceUI(AnimDestructionUIState);
+
+		// TODO - Multiplayer: Winner / Loser animation	
+		// ActiveLeaderWidget->SetLoser(PlayerID);
+
+	}
+
+	/* At the end of the challenge (after all the animations have finished) toggle next player */
+	if (AnimDestructionState == EAnimState::Finished && AnimDestructionUIState == EAnimState::Finished)
+	{
+		// TODO: Multiplayer Close the UI
+		Players[ChallengerIdx]->OnCloseBetUI();
+
+		// Reroll all the player dice
+		for (ADicePlayer* Player : Players)
+		{
+			Player->RollDice();
+		}
+
+		// Reset the current bet
+		CurrentBet = nullptr;
+		BetWidget->ResetCurrentBetText();
+
+		// Remove the acceptable bets
+		CurrentCorrectBets.Empty();
+
+		// Switch to player who lost
+		ToggleNextPlayer(LoserIdx, true, 1.f);
+		
+		ChallengerIdx = -1;
+		LoserIdx = -1;
+		ResetChallengeAnimFlags();
+	}
+}
+
+void ADiceGameMode::ResetChallengeAnimFlags()
+{
+	AnimCountingState = EAnimState::NotStarted;
+	AnimChallengeState = EAnimState::NotStarted;
+	AnimDestructionState = EAnimState::NotStarted;
+	AnimDestructionUIState = EAnimState::NotStarted;
+}
+
+void ADiceGameMode::SubmitChallenge(int32 Challenger)
 {
 	if (!CurrentBet) 
 	{
@@ -77,50 +146,29 @@ void ADiceGameMode::SubmitChallenge(int32 ChallengerIdx)
 	}
 
 	// Increment the counter of dice faces
-	int32 Counter = 0;
+	int32 DiceCounter = 0;
 	int32 CheckFace = CurrentBet->Face;
 	for (ADicePlayer* Player : Players)
 	{
 		for (int32 DiceFace : Player->DiceRolls)
 		{
 			// TODO: JOKER variant
-			if (DiceFace == CheckFace) Counter++;
+			if (DiceFace == CheckFace) DiceCounter++;
 		}
 	}
 
 	int32 PredNumFaces = CurrentBet->NumFaces;
 
+
 	// Player that made the bet lost if predicted too many faces, otherwise challenger loses
-	int32 LoserIdx = PredNumFaces > Counter ? CurrentBet->PlayerIdx : ChallengerIdx;
-	
+	LoserIdx = PredNumFaces > DiceCounter ? CurrentBet->PlayerIdx : Challenger;
+	ChallengerIdx = Challenger;
+
 	// Debug message
 	GEngine->AddOnScreenDebugMessage(-1, 2.5f, FColor::Red, FString::Printf(TEXT("Player %d lost the round"), LoserIdx));
 
-	////////////////////////////////////////////////////
-	// TODO: Animation
-	Players[ChallengerIdx]->RevealLeaderboard();
-	BetWidget->ChallengeStart();
-
-	// TODO: Multiplayer Close the UI
-	Players[ChallengerIdx]->OnCloseBetUI();
-	//////////////////////////////////////////////////////
-
-
-	// Decrease the number of die the losing player has
-	Players[LoserIdx]->RemoveDice();
-
-	// Reroll all the player dice
-	for (ADicePlayer* Player : Players)
-	{
-		Player->RollDice();
-	}
-
-	// Reset the current bet
-	CurrentBet = nullptr;
-	BetWidget->ResetCurrentBetText();
-
-	// Switch to player who lost
-	ToggleNextPlayer(LoserIdx, true, 1.f);
+	Players[ChallengerIdx]->RevealLeaderboard(ChallengerIdx == LoserIdx);
+	BetWidget->ChallengeStart(AnimChallengeState); // , DiceCounter);
 }
 
 void ADiceGameMode::SubmitBet(FBet& PlayerBet)
@@ -130,6 +178,11 @@ void ADiceGameMode::SubmitBet(FBet& PlayerBet)
 	int32 PlayerIdx = PlayerBet.PlayerIdx;
 
 	CurrentBet = new FBet(NumFaces, Face, PlayerIdx);
+
+	// TODO - Variant : Excludes the jokers!
+	CurrentCorrectBets.Empty();
+	CurrentCorrectBets.Add(Face);
+
 
 	BetWidget->SetCurrentBetText(NumFaces, Face, PlayerIdx);
 	ToggleNextPlayer();

@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/SpotLightComponent.h"
+#include "HAL/PlatformProcess.h"
 
 // Called when the game starts or when spawned
 void ADicePlayer::BeginPlay()
@@ -161,26 +162,109 @@ void ADicePlayer::Tick(float DeltaTime)
 	}
 }
 
-void ADicePlayer::RemoveDice()
+void ADicePlayer::RemoveDiceUI(EAnimState& InDestructionUIState)
 {
+	ActiveLeaderWidget->ClearAnimData();
+	
+	DestructionUIState = &InDestructionUIState;
+	*DestructionUIState = EAnimState::Running;
+
+	GetWorld()->GetTimerManager().SetTimer(
+		AnimUITimerHandle,
+		this,
+		&ADicePlayer::AnimateUIDestruction,
+		0.02f,
+		true
+	);
+}
+
+void ADicePlayer::AnimateUIDestruction()
+{
+	DissolveUIVal += Step;
+
+	if (FMath::IsNearlyEqual(DissolveUIVal, 1.0f, 0.01f))
+	{
+		// Stop the timer
+		GetWorld()->GetTimerManager().ClearTimer(AnimUITimerHandle);
+
+		*DestructionUIState = EAnimState::Finished;
+		DissolveUIVal = -1.f;
+
+		return;
+	}
+
+	ActiveLeaderWidget->DestroyLoserUIDice(PlayerID, DissolveUIVal);
+}
+
+void ADicePlayer::RemoveDice(EAnimState& InDestructionState)
+{
+	DestructionState = &InDestructionState;
+	*DestructionState = EAnimState::Running;
+
 	if (DiceActors.Num() == 0 || DiceRolls.Num() == 0)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("One or both arrays are empty."));
+		*DestructionState = EAnimState::Finished;
 		return;
 	}
 
 	// Get the last actor
-	AActor* LastActor = DiceActors.Last();
+	DiceDes = DiceActors.Last();
+
+	// Save the Materials
+	Materials.Empty();
+	if (UStaticMeshComponent* Mesh = DiceDes->FindComponentByClass<UStaticMeshComponent>())
+	{
+		const int32 MaterialCount = Mesh->GetNumMaterials();
+
+		for (int32 i = 0; i < MaterialCount; ++i)
+		{
+			if (UMaterialInstanceDynamic* Mat = Mesh->CreateAndSetMaterialInstanceDynamic(i)) Materials.Add(Mat);
+		}
+	}
+
+	GetWorld()->GetTimerManager().SetTimer(
+		AnimTimerHandle,
+		this,
+		&ADicePlayer::AnimateDestruction,
+		0.02f, 
+		true
+	);
 
 	// Remove the last elements from both arrays
 	DiceActors.Pop();
 	DiceRolls.Pop();
-
-	// Destroy the dice
-	LastActor->Destroy();
-
+	
 	// Reinitialize all rolls to zero
 	DiceRolls.Init(0, DiceRolls.Num());
+}
+
+void ADicePlayer::AnimateDestruction()
+{
+	if (!DiceDes) return; 
+
+	DissolveVal += Step;
+	
+	if (FMath::IsNearlyEqual(DissolveVal, 1.0f, 0.01f))
+	{
+		// Stop the timer
+		GetWorld()->GetTimerManager().ClearTimer(AnimTimerHandle);
+		
+		// Destroy the dice
+		DiceDes->Destroy();
+		DiceDes = nullptr;
+
+		*DestructionState = EAnimState::Finished;
+		DissolveVal = -1.f;
+		
+		return;
+	}
+
+	// Update the dissolve values
+	for (auto* Mat : Materials) // 3D object
+	{
+		Mat->SetScalarParameterValue(FName("Dissolve"), DissolveVal);
+	}
 }
 
 bool ADicePlayer::IsWithinBounds(AActor* Dice) const
@@ -303,7 +387,7 @@ void ADicePlayer::RollOneDice(AActor* Dice)
 	FVector Impulse(
 		FMath::RandRange(-25.f, 25.f),
 		FMath::RandRange(-25.f, 25.f),
-		FMath::RandRange(250.f, 500.f)
+		FMath::RandRange(250.f, 400.f)
 	);
 
 	FVector Torque(
@@ -497,16 +581,25 @@ void ADicePlayer::SetupUI()
 	bIsWaiting = true; // Waiting to play 
 }
 
-void ADicePlayer::RevealLeaderboard()
+void ADicePlayer::RevealLeaderboard(bool bLost)
 {
 	GameMode->RevealLeaderboard(Leaderboard, true);
 	ActiveLeaderWidget->UpdateLeaderboard(Leaderboard, PlayerID);
+	
+	ActiveFaceWidget->SetIsEnabled(false);
+}
+
+
+void ADicePlayer::StartCountingAnim(TArray<int32>& AcceptableBets, EAnimState& InCountingState, UBetWidget* InBetWidget, int32 NumOfFaces)
+{
+	ActiveLeaderWidget->StartCountingAnimation(AcceptableBets, InCountingState, InBetWidget, NumOfFaces);
 }
 
 void ADicePlayer::OnCloseBetUI()
 {
-	if (ActiveFaceWidget) ActiveFaceWidget->RemoveFromParent();
 	if (ActiveLeaderWidget) ActiveLeaderWidget->RemoveFromParent();
+	if (ActiveFaceWidget) ActiveFaceWidget->RemoveFromParent();
+	
 	ActiveFaceWidget = nullptr;
 	ActiveLeaderWidget = nullptr;
 

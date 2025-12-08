@@ -1,10 +1,10 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "BetWidget.h"
+#include "UIEnums.h"
 #include "DiceGameMode.generated.h"
 
 class ADicePlayer;
@@ -50,6 +50,8 @@ class DICE_API ADiceGameMode : public AGameModeBase
 public:
 	ADiceGameMode();
 
+	virtual void Tick(float DeltaTime) override;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -88,9 +90,28 @@ private:
 
 	/** Current Bet **/
 	FBet* CurrentBet = nullptr;
+
+	/** List of values matching the current bet (without jokers only the bet itself counts) **/
+	TArray<int32> CurrentCorrectBets;
 	
 	/** List of Players **/
 	TArray<ADicePlayer*> Players;
+
+	/** Reference to the Player that lost the round **/
+	int32 LoserIdx;
+
+	/** Reference to the Player that performed a challenge **/
+	int32 ChallengerIdx;
+
+	/** End of round flags/states **/
+	EAnimState AnimDestructionState;
+	EAnimState AnimCountingState;
+	EAnimState AnimChallengeState;
+	EAnimState AnimDestructionUIState;
+
+	/** Resets the End of round flags to false **/
+	UFUNCTION()
+	void ResetChallengeAnimFlags();
 
 	/** Active Face UI widget **/
 	UBetWidget* BetWidget = nullptr;
@@ -102,4 +123,5 @@ private:
 	/** End Game Logic **/
 	UFUNCTION()
 	void CheckEndGame();
+
 };

@@ -7,6 +7,7 @@
 #include "FaceSelectionWidget.h"
 #include "LeaderboardWidget.h"
 #include "DiceGameMode.h"
+#include "UIEnums.h"
 #include "DicePlayer.generated.h"
 
 UCLASS()
@@ -43,6 +44,10 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = "Player Info")
 	int32 PlayerID;
 
+	/* Dissolve step speed */
+	UPROPERTY(EditDefaultsOnly, Category = "Destruction")
+	float Step = 0.05f;
+
 	/** Player class to spawn */
 	UPROPERTY(EditDefaultsOnly, Category = "Dice")
 	TSubclassOf<AActor> DiceClass;
@@ -64,10 +69,14 @@ public:
 	void RollDice();
 
 	/* Destroys a Dice */
-	void RemoveDice();
+	void RemoveDice(EAnimState& InDestructionState);
+	void RemoveDiceUI(EAnimState& InDestructionUIState);
 
 	/* Reveals the Leaderboard */
-	void RevealLeaderboard();
+	void RevealLeaderboard(bool bLost);
+
+	/* Triggers the bet counting animation */
+	void StartCountingAnim(TArray<int32>& AcceptableBets, EAnimState& InCountingState, UBetWidget* InBetWidget, int32 NumOfFaces);
 
 	// TODO: Multiplayer -> Protected
 	/** Callbacks to open or close UI for Bidding **/
@@ -135,4 +144,29 @@ private:
 	/* End of the turn for the player */
 	void OnTurnEnd();
 
+	////////////////////////
+	/** Dice Destruction **/
+	////////////////////////
+
+	/* Animates the dice destruction */
+	void AnimateDestruction();
+	void AnimateUIDestruction();
+
+	/* List of material instances for the die about to be destroyed */
+	TArray<UMaterialInstanceDynamic*> Materials;
+	
+	/* Flag from GameMode indicating if the dice was destroyed */
+	EAnimState* DestructionState = nullptr;
+	EAnimState* DestructionUIState = nullptr;
+
+	/* Reference to the dice being destroyed */
+	AActor* DiceDes = nullptr;
+	
+	/* Timer Handle for Destruction animation */
+	FTimerHandle AnimTimerHandle;
+	FTimerHandle AnimUITimerHandle;
+
+	/* Starting Dissolve values for dice destruction */
+	float DissolveVal = -1.f;
+	float DissolveUIVal = -1.f;
 };
