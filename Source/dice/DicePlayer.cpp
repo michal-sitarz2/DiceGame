@@ -571,7 +571,7 @@ void ADicePlayer::SetupUI()
 	}
 
 	// Set the maximum slider value to total number of dice
-	ActiveFaceWidget->SetupSlider(1.f, TotalDiceNum, 1.f);
+	ActiveFaceWidget->SetupSlider(1.f, TotalDiceNum);
 
 	/* Event Callback for Selecting a Face Button*/
 	ActiveFaceWidget->OnFaceChosen.AddDynamic(this, &ADicePlayer::HandleFaceChosen);

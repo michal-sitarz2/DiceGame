@@ -22,10 +22,15 @@ public:
 	UPROPERTY(BlueprintAssignable, BlueprintCallable, Category = "Events")
 	FOnFaceChosen OnFaceChosen;
 
-	// Setups the slider dynamically
-	void SetupSlider(float InMin, float InMax, float InInitialValue = 0.0f);
+	UFUNCTION(BlueprintImplementableEvent, Category = "UI")
+	void ResetButtonClicks();
 
-	int NumOfFaces;
+	// Setups the slider dynamically
+	void SetupSlider(float InMin, float InMax);
+	void ResetSlider();
+
+	int32 NumOfFaces;
+	int32 FaceSelected;
 
 protected:
 	UPROPERTY(meta = (BindWidget))

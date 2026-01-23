@@ -1,7 +1,33 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 
 #include "BetWidget.h"
+#include "MPDiceGameState.h"
+#include "MPDicePlayerState.h"
+
+void UBetWidget::NativeConstruct()
+{
+    Super::NativeConstruct();
+
+    if (APlayerController* PC = GetOwningPlayer())
+    {
+        if (AMPDiceGameState* GS = PC->GetWorld()->GetGameState<AMPDiceGameState>())
+        {
+            GS->OnBetChanged.AddUObject(this, &UBetWidget::HandleBetChanged);
+            HandleBetChanged(GS->CurrentBet);
+        }
+    }
+}
+
+void UBetWidget::HandleBetChanged(const FCurrentBet& Bet)
+{
+    if (!Bet.IsValid())
+    {
+        ResetCurrentBetText();
+        return;
+    }
+    
+    SetCurrentBetText(Bet.Quantity, Bet.Face, Cast<AMPDicePlayerState>(Bet.BettingPlayer)->PlayerIdx);
+}
+
 
 void UBetWidget::SetCurrentBetText(int32 NumFaces, int32 FaceNumber, int32 PlayerIdx)
 {
@@ -47,6 +73,39 @@ void UBetWidget::ResetCurrentBetText()
     RadialPulse->SetBrushFromTexture(EmptyTEX);
 }
 
+void UBetWidget::ChallengeStart()
+{
+    if (ChallengePopUp)
+    {
+        ChallengePopUp->SetVisibility(ESlateVisibility::Visible);
+    }
+    
+    BetCounter = 0;
+
+    if (BetChallengeText)
+    {
+        BetChallengeText->SetText(FText::FromString(TEXT("0")));
+    }
+
+    FTimerHandle ChallengeTimerHandle;
+    GetWorld()->GetTimerManager().SetTimer(
+        ChallengeTimerHandle,
+        this,
+        &UBetWidget::ChallengeEnd,
+        3.f,
+        false
+    );
+}
+
+void UBetWidget::ChallengeEnd()
+{
+    if (ChallengePopUp)
+    {
+        ChallengePopUp->SetVisibility(ESlateVisibility::Hidden);
+    }
+
+    OnChallengeAnimComplete.Broadcast();
+}
 
 void UBetWidget::ChallengeStart(EAnimState& InChallengeState)
 {

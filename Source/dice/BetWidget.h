@@ -12,6 +12,7 @@
 #include "UIEnums.h"
 #include "BetWidget.generated.h"
 
+struct FCurrentBet;
 
 UCLASS()
 class DICE_API UBetWidget : public UUserWidget
@@ -19,13 +20,32 @@ class DICE_API UBetWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+
+	virtual void NativeConstruct() override;
+
 	UFUNCTION(BlueprintCallable, Category = "Widget")
 	void SetCurrentBetText(int32 NumFaces, int32 FaceNumber, int32 PlayerIdx);
 
 	UFUNCTION(BlueprintCallable, Category = "Widget")
 	void ResetCurrentBetText();
 
-	void ChallengeStart(EAnimState& InChallengeState); // , int32 TotalDiceCounter);
+
+	/******************* TODO *******************/
+	// void ChallengeStart(EAnimState& InChallengeState);
+	// void ChallengeStop();
+
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnChallengeAnimComplete);
+
+	UPROPERTY(BlueprintAssignable, Category = "Animation")
+	FOnChallengeAnimComplete OnChallengeAnimComplete;
+
+	void ChallengeStart();
+	void ChallengeEnd();
+
+
+	void ChallengeStart(EAnimState& InChallengeState);
+	void ChallengeStop();
+	/***********************************************************/
 
 	void IncCounter(int32 Desired);
 	
@@ -88,9 +108,7 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	UDiceTextureData* DiceTexturesData;
 
-
-	// Callback to Remove Challenge notification
-	void ChallengeStop();
+	void HandleBetChanged(const FCurrentBet& Bet);
 
 	// Flag used in GameMode tick
 	EAnimState* ChallengeState = nullptr;

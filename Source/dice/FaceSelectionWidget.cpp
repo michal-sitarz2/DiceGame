@@ -14,7 +14,16 @@ void UFaceSelectionWidget::NativeConstruct()
     }
 }
 
-void UFaceSelectionWidget::SetupSlider(float InMin, float InMax, float InInitialValue)
+void UFaceSelectionWidget::ResetSlider()
+{
+    if (PredSlider)
+    {
+        PredSlider->SetValue(1.f);
+        OnSliderValueChanged(1.f);
+    }
+}
+
+void UFaceSelectionWidget::SetupSlider(float InMin, float InMax)
 {
     MinValue = InMin;
     MaxValue = InMax;
@@ -23,10 +32,10 @@ void UFaceSelectionWidget::SetupSlider(float InMin, float InMax, float InInitial
     {
         PredSlider->SetMinValue(MinValue);
         PredSlider->SetMaxValue(MaxValue);
-        PredSlider->SetValue(InInitialValue);
+        ResetSlider();
     }
 
-    OnSliderValueChanged(InInitialValue);
+    
 }
 
 void UFaceSelectionWidget::OnSliderValueChanged(float Value)
