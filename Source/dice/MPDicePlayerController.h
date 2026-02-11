@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "BetWidget.h"
 #include "FaceSelectionWidget.h"
+#include "MPLeaderboardWidget.h"
 #include "GameFramework/PlayerController.h"
 #include "MPDicePlayerController.generated.h"
 
@@ -29,7 +30,7 @@ public:
 	void Server_NotifyRollComplete();
 
 	UFUNCTION(Server, Reliable)
-	void Server_NotifyChallengeAnimComplete();
+	void Server_NotifyAnimChallengeComplete();
 
 	UFUNCTION(Client, Reliable)
 	void Client_ReceiveOwnDice(const TArray<int32>& DiceValues);
@@ -41,9 +42,16 @@ public:
 	void Client_NotifyTurnEnd();
 
 	UFUNCTION(Client, Reliable)
-	void Client_ShowChallengeAnim();
+	void Client_StartAnimChallenge();
+
+	UFUNCTION(Client, Reliable)
+	void Client_PrepAnimCounting(const TArray<int32>& InAcceptableBets, int32 InBetQuantity);
+
+	UFUNCTION(Server, Reliable)
+	void Server_NotifyAnimCountingComplete();
 
 protected:
+	
 	void SetupInputComponent() override;
 	void OnPossess(APawn* InPawn) override;
 	
@@ -51,9 +59,13 @@ protected:
 	void RequestChallenge();
 	void RequestBetSubmission();
 
-	UFUNCTION()
-	void OnChallengeAnimComplete();
 	void DiceVisualizationComplete();
+
+	UFUNCTION()
+	void OnAnimChallengeComplete();
+
+	UFUNCTION()
+	void OnAnimCountingComplete();
 
 	TArray<int32> ActiveDiceValues;
 
@@ -64,6 +76,7 @@ private:
 	// bool IsActivePlayer() const;
 	int32 GetPlayerIdx() const;
 
+	void HandleGameStarted();
 	void RevealUI();
 	void HideUI();
 
@@ -74,9 +87,13 @@ private:
 	TSubclassOf<UFaceSelectionWidget> FaceSelectionWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UMPLeaderboardWidget> LeaderboardWidgetClass;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UBetWidget> BetWidgetClass;
 
 	UFaceSelectionWidget* ActiveFaceSelectionWidget = nullptr;
+	UMPLeaderboardWidget* ActiveLeaderboardWidget = nullptr;
 	UBetWidget* ActiveBetWidget = nullptr;
 
 };

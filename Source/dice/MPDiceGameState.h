@@ -57,6 +57,12 @@ public:
     UPROPERTY(ReplicatedUsing = OnRep_CurrentBet)
     FCurrentBet CurrentBet;
 
+    DECLARE_MULTICAST_DELEGATE(FOnGameStarted);
+    FOnGameStarted OnGameStarted;
+
+    UPROPERTY(ReplicatedUsing = OnRep_GameStarted)
+    bool bGameStarted = false;
+
     DECLARE_MULTICAST_DELEGATE_OneParam(FOnBetChanged, const FCurrentBet&);
     FOnBetChanged OnBetChanged;
 
@@ -65,11 +71,15 @@ public:
 
     int32 GetTotalDice();
 
-    void BroadcastBetChanged() { OnBetChanged.Broadcast(CurrentBet); }
+    void BroadcastBetChanged();
+    void BroadcastGameStarted();
 
 protected:
     UFUNCTION()
     void OnRep_CurrentBet() { OnBetChanged.Broadcast(CurrentBet); }
+
+    UFUNCTION()
+    void OnRep_GameStarted() { OnGameStarted.Broadcast(); }
 
     virtual void GetLifetimeReplicatedProps(
         TArray<FLifetimeProperty>& OutLifetimeProps

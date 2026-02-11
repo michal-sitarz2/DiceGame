@@ -21,8 +21,17 @@ int32 AMPDiceGameState::GetTotalDice()
 			TotalDice += MPPlayerState->DiceCount;
 		}
 	}
-
 	return TotalDice;
+}
+
+void AMPDiceGameState::BroadcastBetChanged() 
+{ 
+	OnBetChanged.Broadcast(CurrentBet); 
+}
+
+void AMPDiceGameState::BroadcastGameStarted()
+{
+	OnGameStarted.Broadcast();
 }
 
 void AMPDiceGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -32,6 +41,7 @@ void AMPDiceGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AMPDiceGameState, Phase);
 	DOREPLIFETIME(AMPDiceGameState, ActivePlayer);
 	DOREPLIFETIME(AMPDiceGameState, CurrentBet);
+	DOREPLIFETIME(AMPDiceGameState, bGameStarted);
 }
 
 

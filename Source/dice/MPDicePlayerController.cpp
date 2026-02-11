@@ -12,33 +12,64 @@ void AMPDicePlayerController::BeginPlay()
     
     bIsActive = false;
 
+    TArray<FString> FailedUI;
     if (IsLocalController())
     {
+        UE_LOG(LogTemp, Warning, TEXT("Setting up UI"));
+        /* Face Selection Widget */
         ActiveFaceSelectionWidget = CreateWidget<UFaceSelectionWidget>(this, FaceSelectionWidgetClass);
         if (ActiveFaceSelectionWidget)
         {
-            /* Event Callback for Selecting a Face Button */
             ActiveFaceSelectionWidget->OnFaceChosen.AddDynamic(this, &AMPDicePlayerController::HandleFaceChosen);
 
-            ActiveFaceSelectionWidget->AddToViewport();
+            ActiveFaceSelectionWidget->AddToViewport(10);
             ActiveFaceSelectionWidget->SetVisibility(ESlateVisibility::Hidden);
+        } 
+        else
+        {
+            FailedUI.Add(TEXT("FaceSelectionWidget"));
         }
 
+        /* Leaderboard Widget */
+        ActiveLeaderboardWidget = CreateWidget<UMPLeaderboardWidget>(this, LeaderboardWidgetClass);
+        if (ActiveLeaderboardWidget)
+        {
+            ActiveLeaderboardWidget->OnCountingAnimComplete.AddDynamic(this, &AMPDicePlayerController::OnAnimCountingComplete);
+
+            ActiveLeaderboardWidget->AddToViewport(0);
+            ActiveLeaderboardWidget->SetVisibility(ESlateVisibility::Hidden);
+        }
+        else
+        {
+            FailedUI.Add(TEXT("LeaderboardWidget"));
+        }
+
+        /* Bet Widget */
         ActiveBetWidget = CreateWidget<UBetWidget>(this, BetWidgetClass);
         if (ActiveBetWidget) {
             
-            ActiveBetWidget->OnChallengeAnimComplete.AddDynamic(this, &AMPDicePlayerController::OnChallengeAnimComplete);
+            ActiveBetWidget->OnChallengeAnimComplete.AddDynamic(this, &AMPDicePlayerController::OnAnimChallengeComplete);
             
-            ActiveBetWidget->AddToViewport();
+            ActiveBetWidget->AddToViewport(1);
             ActiveBetWidget->ResetCurrentBetText();
+        }
+        else
+        {
+            FailedUI.Add(TEXT("BetWidget"));
         }
     }
 
-    if (!IsLocalController() || !ActiveFaceSelectionWidget)
+    if (!IsLocalController() || !FailedUI.IsEmpty())
     {
-        UE_LOG(LogTemp, Error, TEXT("Failed setting up Bet UI"));
+        FString Joined = FString::Join(FailedUI, TEXT(", "));
+        UE_LOG(LogTemp, Error, TEXT("Failed setting up UI; %s"), *Joined);
     }
 
+    if (AMPDiceGameState* GS = GetWorld()->GetGameState<AMPDiceGameState>())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Setup: HandleGameStart"));
+        GS->OnGameStarted.AddUObject(this, &AMPDicePlayerController::HandleGameStarted);
+    }
 }
 
 void AMPDicePlayerController::SetupInputComponent()
@@ -64,6 +95,16 @@ void AMPDicePlayerController::OnPossess(APawn* InPawn)
     {
         MPPlayerState->DiceCount = MPGameState->InitDiceNum;
         DicePawn->UpdateDiceCounts(MPGameState->InitDiceNum);
+    }
+}
+
+void AMPDicePlayerController::HandleGameStarted()
+{
+    if (ActiveLeaderboardWidget)
+    {
+        ActiveLeaderboardWidget->SetVisibility(ESlateVisibility::Visible);
+        ActiveLeaderboardWidget->SetupPlayers();
+        ActiveLeaderboardWidget->UpdatePlayerDice(GetPlayerIdx(), ActiveDiceValues);
     }
 }
 
@@ -109,30 +150,57 @@ void AMPDicePlayerController::HandleFaceChosen(int32 FaceVal)
     DicePawn->HighlightDice(ActiveDiceValues, FaceVal);
 }
 
-/*****************************************/
-/** Server, Client: Challenge Animation **/
-/*****************************************/
-void AMPDicePlayerController::OnChallengeAnimComplete()
+/********************************/
+/** Server, Client: Animations **/
+/********************************/
+void AMPDicePlayerController::OnAnimChallengeComplete()
 {
-    Server_NotifyChallengeAnimComplete();
+    Server_NotifyAnimChallengeComplete();
 }
 
-void AMPDicePlayerController::Server_NotifyChallengeAnimComplete_Implementation()
+void AMPDicePlayerController::OnAnimCountingComplete()
+{
+    Server_NotifyAnimCountingComplete();
+}
+
+void AMPDicePlayerController::Server_NotifyAnimChallengeComplete_Implementation()
 {
     AMPDiceGameMode* GM = GetWorld()->GetAuthGameMode<AMPDiceGameMode>();
     if (GM)
     {
-        GM->OnPlayerChallengeAnimComplete(this);
+        GM->OnAnimChallengeComplete(this);
     }
 }
 
-void AMPDicePlayerController::Client_ShowChallengeAnim_Implementation()
+void AMPDicePlayerController::Server_NotifyAnimCountingComplete_Implementation()
+{
+    AMPDiceGameMode* GM = GetWorld()->GetAuthGameMode<AMPDiceGameMode>();
+    if (GM)
+    {
+        GM->OnAnimCountingComplete(this);
+    }
+}
+
+void AMPDicePlayerController::Client_StartAnimChallenge_Implementation()
 {
     if (ActiveBetWidget)
     {
         ActiveBetWidget->ChallengeStart();
     }
 }
+
+
+// TODO: Not used
+void AMPDicePlayerController::Client_PrepAnimCounting_Implementation(const TArray<int32>& InAcceptableBets, int32 InBetQuantity)
+{
+    if (!ActiveLeaderboardWidget || !ActiveBetWidget) return;
+
+    UE_LOG(LogTemp, Warning, TEXT("[CLIENT] Preparing counting animation"));
+
+    ActiveLeaderboardWidget->PrepCountingAnimation(InAcceptableBets, ActiveBetWidget, InBetQuantity);
+}
+
+
 
 /****************************/
 /** Server: Bet Submission **/
@@ -190,7 +258,6 @@ void AMPDicePlayerController::RequestDiceRoll()
 
 void AMPDicePlayerController::Server_RequestDiceRoll_Implementation()
 {
-
     // TODO: Check if already rolled
 
     AMPDiceGameState* MPGameState = GetWorld()->GetGameState<AMPDiceGameState>();
@@ -229,6 +296,12 @@ void AMPDicePlayerController::Client_ReceiveOwnDice_Implementation(const TArray<
             false
         );
     }
+
+    if (ActiveLeaderboardWidget)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Updating Player Dice for Player %d"), GetPlayerIdx());
+        ActiveLeaderboardWidget->UpdatePlayerDice(GetPlayerIdx(), ActiveDiceValues);
+    }
 }
 
 /*************************/
@@ -260,10 +333,10 @@ void AMPDicePlayerController::Client_NotifyTurnEnd_Implementation()
     bIsActive = false;
     HideUI();
 
-    AMPDicePlayer* DicePawn = GetPawn<AMPDicePlayer>();
-    if (!DicePawn) return;
-
-    DicePawn->UndoHighlightDice();
+    if (AMPDicePlayer* DicePawn = GetPawn<AMPDicePlayer>())
+    {
+        DicePawn->UndoHighlightDice();
+    }
 }
 
 
@@ -274,6 +347,10 @@ void AMPDicePlayerController::Client_NotifyTurnEnd_Implementation()
 
 int32 AMPDicePlayerController::GetPlayerIdx() const
 {
-    AMPDicePlayerState* MPPlayerState = GetPlayerState<AMPDicePlayerState>();
-    return MPPlayerState->PlayerIdx;
+    if (AMPDicePlayerState* MPPlayerState = GetPlayerState<AMPDicePlayerState>())
+    {
+        return MPPlayerState->PlayerIdx;
+    }
+
+    return INDEX_NONE;
 }

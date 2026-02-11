@@ -37,18 +37,30 @@ public:
 
 	void OnPlayerBet(APlayerController* Bettor, int32 Quantity, int32 FaceVal);
 	void OnPlayerChallenge(APlayerController* InChallenger);
-	void OnPlayerChallengeAnimComplete(APlayerController* InPlayerController);
 
+	void OnAnimChallengeComplete(APlayerController* InPlayerController);
+	void OnAnimCountingComplete(APlayerController* InPlayerController);
+	void OnAnimDestroyComplete(APlayerController* InPlayerController);
+	
 protected:
 	int32 TurnIdx;
 	AMPDicePlayerState* NextPlayer = nullptr;
 	APlayerController* Challenger = nullptr;
+	AMPDicePlayerState* Loser = nullptr;
 
 private:
 	void DiceToOwner(AMPDicePlayerState* PlayerState) const;
+	void EndOfRound();
 	void CheckStartTurn();
+
+	void RevealDice();
+	void HideDice();
+	void DestroyDice();
+
+	int CountCurrentBet() const;
 	void NotifyPlayerTurn(int32 PlayerIdx) const;
 	bool IsValidBet(int32 Quantity, int32 Face);
+	bool CheckAnimComplete(APlayerController* InPlayerController);
 
 	TArray<APlayerController*> CompletedAnimationPlayers;
 };

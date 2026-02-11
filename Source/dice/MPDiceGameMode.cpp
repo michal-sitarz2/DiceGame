@@ -62,6 +62,13 @@ void AMPDiceGameMode::CheckStartTurn()
 		if (!MPPlayer->bRolled) return;
 	}
 
+	// TODO: Broadcast here? Change to turn start?
+	if (!MPGameState->bGameStarted)
+	{
+		MPGameState->bGameStarted = true;
+		MPGameState->BroadcastGameStarted();
+	}
+
 	// TODO: Check if enough players!!! (LOBBY)
 
 	StartTurn();
@@ -237,6 +244,7 @@ void AMPDiceGameMode::NotifyPlayerTurn(int32 PlayerIdx) const
 
 			if (!PS || !MPPC) return;
 
+			// Notify which player is the current player
 			if (PS->PlayerIdx == PlayerIdx) // This is the active player - show their UI
 			{	 
 				MPPC->Client_NotifyTurnStart();
@@ -280,6 +288,43 @@ void AMPDiceGameMode::RollDice(AMPDicePlayerState* PlayerState)
 	DiceToOwner(PlayerState);
 }
 
+
+void AMPDiceGameMode::RevealDice()
+{
+	AMPDiceGameState* MPGameState = GetGameState<AMPDiceGameState>();
+	if (!MPGameState) return;
+
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		AMPDicePlayerController* PC = Cast<AMPDicePlayerController>(It->Get());
+		if (!PC) continue;
+
+		AMPDicePlayerState* MPPlayer = PC->GetPlayerState<AMPDicePlayerState>();
+		if (!MPPlayer) continue;
+
+		// TODO:
+		TArray<int32> AcceptableBets;
+		AcceptableBets.Add(MPGameState->CurrentBet.Face);
+		PC->Client_PrepAnimCounting(AcceptableBets, MPGameState->CurrentBet.Quantity);
+		
+		MPPlayer->RevealDice();
+	}
+}
+
+void AMPDiceGameMode::HideDice()
+{
+	AMPDiceGameState* GS = GetGameState<AMPDiceGameState>();
+	if (!GS) return;
+
+	for (APlayerState* Player : GS->PlayerArray)
+	{
+		AMPDicePlayerState* MPPlayer = Cast<AMPDicePlayerState>(Player);
+		if (!MPPlayer) continue;
+
+		MPPlayer->HideDice();
+	}
+}
+
 void AMPDiceGameMode::DiceToOwner(AMPDicePlayerState* PlayerState) const
 {
 	if (!PlayerState) return;
@@ -295,6 +340,7 @@ void AMPDiceGameMode::DiceToOwner(AMPDicePlayerState* PlayerState) const
 
 // TODO: PERUDO (jokers) -> switch game modes?
 // TODO: Extra Rules
+// TODO: Get Acceptable Bets
 bool AMPDiceGameMode::IsValidBet(int32 Quantity, int32 Face)
 {
 	AMPDiceGameState* MPGameState = GetGameState<AMPDiceGameState>();
@@ -363,97 +409,146 @@ void AMPDiceGameMode::OnPlayerChallenge(APlayerController* InChallenger)
 		if (PC)
 		{
 			PC->Client_NotifyTurnEnd();
-			PC->Client_ShowChallengeAnim();
+			PC->Client_StartAnimChallenge();
 		}
 	}
 }
 
-
-void AMPDiceGameMode::OnPlayerChallengeAnimComplete(APlayerController* InPlayerController)
+int AMPDiceGameMode::CountCurrentBet() const
 {
-	UE_LOG(LogTemp, Warning, TEXT("Called Challenge Animation Complete"));
-
-	CompletedAnimationPlayers.Add(InPlayerController);
-	if (CompletedAnimationPlayers.Num() < GetNumPlayers()) return;
-
-	UE_LOG(LogTemp, Warning, TEXT("Challenge Animation Complete"));
-	CompletedAnimationPlayers.Empty();
-
-	
-	// TODO: Check winner/looser
-
 	AMPDiceGameState* MPGameState = GetGameState<AMPDiceGameState>();
-	if (!MPGameState) return;
+	if (!MPGameState) return 0;
 
-	int32 DiceCount = 0;
+	int DiceCount = 0;
 	for (auto& Player : MPGameState->PlayerArray)
 	{
 		AMPDicePlayerState* MPPlayer = Cast<AMPDicePlayerState>(Player);
+		if (!MPPlayer) continue;
+
 		for (int32 FaceVal : MPPlayer->DiceValues)
 		{
 			if (FaceVal == MPGameState->CurrentBet.Face)
 				DiceCount++;
 		}
 	}
+	return DiceCount;
+}
 
+void AMPDiceGameMode::EndOfRound()
+{
+	AMPDiceGameState* MPGameState = GetGameState<AMPDiceGameState>();
+	if (!MPGameState) return;
+
+	//// TODO: Check if enough players! (END GAME)
+	//int32 PlayerCounter = 0;
+	//for (auto& Player : MPGameState->PlayerArray)
+	//{
+	//	AMPDicePlayerState* MPPlayer = Cast<AMPDicePlayerState>(Player);
+	//	if (MPPlayer->DiceCount >= 0) PlayerCounter++;
+
+	//	if (PlayerCounter > 1) break;
+	//}
+
+	//if (PlayerCounter <= 1)
+	//{
+	//	MPGameState->Phase = ETurnPhase::Finished;
+	//	return;
+	//}
+
+
+
+
+
+
+	//HideDice();
+
+	//// Reset bet values
+	//Loser = nullptr;
+	//MPGameState->CurrentBet.Reset();
+	//MPGameState->BroadcastBetChanged();
+	//MPGameState->Phase = ETurnPhase::Rolling;
+
+	//NotifyPlayerTurn(INDEX_NONE); // Hides UI for all players
+}
+
+void AMPDiceGameMode::OnAnimChallengeComplete(APlayerController* InPlayerController)
+{
+	if (!CheckAnimComplete(InPlayerController)) return;
+	UE_LOG(LogTemp, Warning, TEXT("[GameMode] Challenge Animation Complete"));
+
+	// Check winner/looser of the round
+	AMPDiceGameState* MPGameState = GetGameState<AMPDiceGameState>();
+	if (!MPGameState) return;
+	
+	int DiceCount = CountCurrentBet();
 
 	AMPDicePlayerState* BettingPlayer = Cast<AMPDicePlayerState>(MPGameState->CurrentBet.BettingPlayer);
-	AMPDicePlayerState* Loser = (DiceCount >= MPGameState->CurrentBet.Quantity) ?
-		BettingPlayer : Challenger->GetPlayerState<AMPDicePlayerState>();
+	Loser = (DiceCount >= MPGameState->CurrentBet.Quantity) 
+		? BettingPlayer : Challenger->GetPlayerState<AMPDicePlayerState>();
 
 	Loser->DiceCount--;
 	Challenger = nullptr;
+	NextPlayer = Loser; 
+	
+	// TODO: Separate Reveal and Counting Animation?
+	RevealDice();
+}
+
+void AMPDiceGameMode::DestroyDice()
+{
+	AMPDiceGameState* GS = GetGameState<AMPDiceGameState>();
+	if (!GS) return;
 
 
-	// TODO?
-	APlayerController* PlayerController = Cast<APlayerController>(Loser->GetOwner());
-	if (!PlayerController)
-	{
-		UE_LOG(LogTemp, Error, TEXT("PlayerController not found"));
-		return;
-	}
-
-	APawn* Pawn = PlayerController->GetPawn();
-	if (!Pawn)
-	{
-		UE_LOG(LogTemp, Error, TEXT("Pawn not found"));
-		return;
-	}
-
-	AMPDicePlayer* DicePawn = Cast<AMPDicePlayer>(Pawn);
-	if (!DicePawn)
-	{
-		UE_LOG(LogTemp, Error, TEXT("DicePawn not found"));
-		return;
-	}
-
-	// Removes the dice for the losing player
-	DicePawn->UpdateDiceCounts(Loser->DiceCount);
+	UE_LOG(LogTemp, Error, TEXT("TODO!! DestroyDice"));
 
 
-	// Reset bet values
-	MPGameState->CurrentBet.Reset();
-	MPGameState->BroadcastBetChanged();
+	/****************** TODO **************************/
+	//// TODO: Destroy UI Dice Animation
+
+	//AMPDicePlayer* LoserDicePawn = Loser->GetDicePawn();
+	//if (!LoserDicePawn) return;
+
+	//// Removes the dice for the losing player
+	//// TODO: Destruction Animation
+	//LoserDicePawn->UpdateDiceCounts(Loser->DiceCount);
 
 
-	// TODO: Check if enough players! (END GAME)
-	int32 PlayerCounter = 0;
-	for (auto& Player : MPGameState->PlayerArray)
+	/*for (APlayerState* Player : GS->PlayerArray)
 	{
 		AMPDicePlayerState* MPPlayer = Cast<AMPDicePlayerState>(Player);
-		if (MPPlayer->DiceCount >= 0) PlayerCounter++;
+		if (!MPPlayer) continue;
 
-		if (PlayerCounter > 1) break;
-	}
+		MPPlayer->DestroyUIDice();
+	}*/
+}
 
-	// TODO: END GAME
-	if (PlayerCounter <= 1)
-	{
-		MPGameState->Phase = ETurnPhase::Finished;
-		return;
-	}
+void AMPDiceGameMode::OnAnimCountingComplete(APlayerController* InPlayerController)
+{
+	if (!CheckAnimComplete(InPlayerController)) return;
+	UE_LOG(LogTemp, Warning, TEXT("[GameMode] Counting Animation Complete"));
+	
+	EndOfRound();
+	// DestroyDice();
+}
 
-	MPGameState->Phase = ETurnPhase::Rolling;
-	NotifyPlayerTurn(-1); // Hides UI for all players
-	NextPlayer = Loser;
+
+void AMPDiceGameMode::OnAnimDestroyComplete(APlayerController* InPlayerController)
+{
+	if (!CheckAnimComplete(InPlayerController)) return;
+	UE_LOG(LogTemp, Warning, TEXT("[GameMode] Counting Animation Complete"));
+	
+	EndOfRound();
+}
+
+bool AMPDiceGameMode::CheckAnimComplete(APlayerController* InPlayerController)
+{
+	CompletedAnimationPlayers.Add(InPlayerController);
+
+	if (CompletedAnimationPlayers.Num() < GetNumPlayers()) 
+		return false;
+	
+	CompletedAnimationPlayers.Empty();
+	return true;
+
 }
