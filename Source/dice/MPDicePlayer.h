@@ -15,6 +15,12 @@ public:
 	// Sets default values for this pawn's properties
 	AMPDicePlayer();
 
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDiceDestructionComplete);
+	UPROPERTY(BlueprintAssignable)
+	FOnDiceDestructionComplete OnDiceDestructionComplete;
+
+	void StartDestructionAnimation();
+
 	void UpdateDiceCounts(int32 DiceCount);
 	void UpdateDiceVisuals(const TArray<int32>& DiceVals);
 
@@ -32,8 +38,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Dice")
 	TSubclassOf<AActor> DiceClass;
 
-
-private:
 	/** Root Component **/
 	UPROPERTY(VisibleAnywhere)
 	USceneComponent* Root;
@@ -46,5 +50,28 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	class USpotLightComponent* PlayerLight;
 
+
+private:
 	FRotator GetDiceRotation(int32 FaceVal) const;
+	
+	////////////////////////
+	/** Dice Destruction **/
+	////////////////////////
+
+	void PlayDestructionAnimation();
+
+	/* Reference to the dice being destroyed */
+	AActor* DiceDestroy = nullptr;
+
+	/* Dissolve step speed */
+	float DissolveStep = 0.05f;
+
+	/* Starting Dissolve value for dice destruction */
+	float DissolveVal = -1.f;
+
+	/* Timer Handle for Destruction animation */
+	FTimerHandle DestroyTimerHandle;
+
+	/* List of material instances for the die about to be destroyed */
+	TArray<UMaterialInstanceDynamic*> Materials;
 };

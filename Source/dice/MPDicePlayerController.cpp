@@ -35,6 +35,7 @@ void AMPDicePlayerController::BeginPlay()
         if (ActiveLeaderboardWidget)
         {
             ActiveLeaderboardWidget->OnCountingAnimComplete.AddDynamic(this, &AMPDicePlayerController::OnAnimCountingComplete);
+            ActiveLeaderboardWidget->OnDestructionAnimComplete.AddDynamic(this, &AMPDicePlayerController::OnAnimUIDestroyComplete);
 
             ActiveLeaderboardWidget->AddToViewport(0);
             ActiveLeaderboardWidget->SetVisibility(ESlateVisibility::Hidden);
@@ -56,6 +57,18 @@ void AMPDicePlayerController::BeginPlay()
         else
         {
             FailedUI.Add(TEXT("BetWidget"));
+        }
+
+
+        ActiveRollPromptWidget = CreateWidget<UUserWidget>(this, RollPromptWidgetClass);
+        if (ActiveRollPromptWidget)
+        {
+            ActiveRollPromptWidget->AddToViewport(0);
+            ActiveRollPromptWidget->SetVisibility(ESlateVisibility::Visible);
+        }
+        else
+        {
+            FailedUI.Add(TEXT("RollPromptWidget"));
         }
     }
 
@@ -106,6 +119,11 @@ void AMPDicePlayerController::HandleGameStarted()
         ActiveLeaderboardWidget->SetupPlayers();
         ActiveLeaderboardWidget->UpdatePlayerDice(GetPlayerIdx(), ActiveDiceValues);
     }
+    
+    if (AMPDicePlayer* DicePawn = GetPawn<AMPDicePlayer>())
+    {
+        DicePawn->OnDiceDestructionComplete.AddDynamic(this, &AMPDicePlayerController::OnAnimDiceDestroyComplete);
+    }
 }
 
 
@@ -150,6 +168,7 @@ void AMPDicePlayerController::HandleFaceChosen(int32 FaceVal)
     DicePawn->HighlightDice(ActiveDiceValues, FaceVal);
 }
 
+
 /********************************/
 /** Server, Client: Animations **/
 /********************************/
@@ -161,6 +180,31 @@ void AMPDicePlayerController::OnAnimChallengeComplete()
 void AMPDicePlayerController::OnAnimCountingComplete()
 {
     Server_NotifyAnimCountingComplete();
+}
+
+void AMPDicePlayerController::OnAnimDiceDestroyComplete()
+{
+    UE_LOG(LogTemp, Error, TEXT("Player %d: Dice Destroy Complete"), GetPlayerIdx());
+
+    bDiceDestructionComplete = true;
+    CheckDestructionComplete();
+}
+
+void AMPDicePlayerController::OnAnimUIDestroyComplete()
+{
+    UE_LOG(LogTemp, Error, TEXT("Player %d: UI Destroy Complete"), GetPlayerIdx());
+    
+    bUIDestructionComplete = true;
+    CheckDestructionComplete();
+}
+
+void AMPDicePlayerController::Server_NotifyAnimDestroyComplete_Implementation()
+{
+    AMPDiceGameMode* GM = GetWorld()->GetAuthGameMode<AMPDiceGameMode>();
+    if (GM)
+    {
+        GM->OnAnimDestroyComplete(this);
+    }
 }
 
 void AMPDicePlayerController::Server_NotifyAnimChallengeComplete_Implementation()
@@ -189,8 +233,6 @@ void AMPDicePlayerController::Client_StartAnimChallenge_Implementation()
     }
 }
 
-
-// TODO: Not used
 void AMPDicePlayerController::Client_PrepAnimCounting_Implementation(const TArray<int32>& InAcceptableBets, int32 InBetQuantity)
 {
     if (!ActiveLeaderboardWidget || !ActiveBetWidget) return;
@@ -200,7 +242,47 @@ void AMPDicePlayerController::Client_PrepAnimCounting_Implementation(const TArra
     ActiveLeaderboardWidget->PrepCountingAnimation(InAcceptableBets, ActiveBetWidget, InBetQuantity);
 }
 
+void AMPDicePlayerController::Client_StartAnimDestruction_Implementation(int32 LosingPlayerIdx)
+{
+    UE_LOG(LogTemp, Warning, TEXT("[CLIENT] Starting dice destruction"), LosingPlayerIdx);
+    
+    bDiceDestructionComplete = false;
+    bUIDestructionComplete = false;
 
+    AMPDicePlayerState* MyPS = GetPlayerState<AMPDicePlayerState>();
+    bool bIsLoser = false;
+    if (MyPS)
+        bIsLoser = MyPS->PlayerIdx == LosingPlayerIdx;
+
+    if (bIsLoser) // #1 Start Dice destruction animation for the losing player
+    {
+        AMPDicePlayer* DicePawn = GetPawn<AMPDicePlayer>();
+        if (DicePawn)
+        {
+            DicePawn->StartDestructionAnimation();
+        }
+        else
+        {
+            bDiceDestructionComplete = true;
+        }
+    }
+    else 
+    {
+        bDiceDestructionComplete = true;
+    }
+
+    // #2 Start UI Dice destruction animation for all the players
+    if (ActiveLeaderboardWidget)
+    {
+        ActiveLeaderboardWidget->StartDestructionAnimation(LosingPlayerIdx);
+    }
+    else
+    {
+        bUIDestructionComplete = true;
+    }
+
+    CheckDestructionComplete();
+}
 
 /****************************/
 /** Server: Bet Submission **/
@@ -302,6 +384,11 @@ void AMPDicePlayerController::Client_ReceiveOwnDice_Implementation(const TArray<
         UE_LOG(LogTemp, Warning, TEXT("Updating Player Dice for Player %d"), GetPlayerIdx());
         ActiveLeaderboardWidget->UpdatePlayerDice(GetPlayerIdx(), ActiveDiceValues);
     }
+
+    if (ActiveRollPromptWidget)
+    {
+        ActiveRollPromptWidget->SetVisibility(ESlateVisibility::Hidden);
+    }
 }
 
 /*************************/
@@ -320,8 +407,15 @@ void AMPDicePlayerController::Server_NotifyRollComplete_Implementation()
     }
 }
 
+void AMPDicePlayerController::Client_NotifyTurnRestart_Implementation()
+{
+    if (ActiveRollPromptWidget)
+    {
+        ActiveRollPromptWidget->SetVisibility(ESlateVisibility::Visible);
+    }
+}
 
-// TODO: Add boolean bActive flag
+// TODO: Add boolean bActive flag?
 void AMPDicePlayerController::Client_NotifyTurnStart_Implementation()
 {
     bIsActive = true;
@@ -339,11 +433,19 @@ void AMPDicePlayerController::Client_NotifyTurnEnd_Implementation()
     }
 }
 
-
-
 /**********************/
 /** Helper Functions **/
 /**********************/
+void AMPDicePlayerController::CheckDestructionComplete()
+{
+    if (bDiceDestructionComplete && bUIDestructionComplete)
+    {
+        bDiceDestructionComplete = false;
+        bUIDestructionComplete = false;
+
+        Server_NotifyAnimDestroyComplete();
+    }
+}
 
 int32 AMPDicePlayerController::GetPlayerIdx() const
 {

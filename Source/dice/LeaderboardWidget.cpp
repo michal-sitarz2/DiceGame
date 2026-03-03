@@ -93,37 +93,37 @@ void ULeaderboardWidget::UpdateLeaderboard(TMap<int32, TArray<int32>>& Leaderboa
         int i = 0;
         for (const int32 Dice : PlayerDice)
         {
-        UImage* ImageWidget = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
+            UImage* ImageWidget = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
             
-        UTexture2D* DiceTex = DiceTexturesData->DiceTextures[Dice];
-        if (!IconMat)
-        {
-            ImageWidget->SetBrushFromTexture(DiceTex);
-        }
-        else
-        {
-            UMaterialInstanceDynamic* DynamicMaterial = UMaterialInstanceDynamic::Create(IconMat, this);
-            ImageWidget->SetBrushFromMaterial(DynamicMaterial);
-            DynamicMaterial->SetTextureParameterValue(FName("DiceTexture"), DiceTex);
-        }
-
-        if (UHorizontalBoxSlot* ImageSlot = CurrentPlayerIcons->AddChildToHorizontalBox(ImageWidget))
-        {
-            
-            if (i == 4) // Last needs extra padding on the right (assumes 5 dice in total)
+            UTexture2D* DiceTex = DiceTexturesData->DiceTextures[Dice];
+            if (!IconMat)
             {
-                ImageSlot->SetPadding(FMargin(10.f, 3.f));
+                ImageWidget->SetBrushFromTexture(DiceTex);
             }
-            else // Padding for all the other components
+            else
             {
-                ImageSlot->SetPadding(FMargin(10.f, 3.f, 0.f, 3.f));
+                UMaterialInstanceDynamic* DynamicMaterial = UMaterialInstanceDynamic::Create(IconMat, this);
+                ImageWidget->SetBrushFromMaterial(DynamicMaterial);
+                DynamicMaterial->SetTextureParameterValue(FName("DiceTexture"), DiceTex);
             }
 
-            ImageSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-        }   
-        i++;
+            if (UHorizontalBoxSlot* ImageSlot = CurrentPlayerIcons->AddChildToHorizontalBox(ImageWidget))
+            {
             
-        PlayerUIData[CurrentPlayer].Dice.Add(Dice);
+                if (i == 4) // Last needs extra padding on the right (assumes 5 dice in total)
+                {
+                    ImageSlot->SetPadding(FMargin(10.f, 3.f));
+                }
+                else // Padding for all the other components
+                {
+                    ImageSlot->SetPadding(FMargin(10.f, 3.f, 0.f, 3.f));
+                }
+
+                ImageSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+            }   
+            i++;
+            
+            PlayerUIData[CurrentPlayer].Dice.Add(Dice);
         }
     }
 }

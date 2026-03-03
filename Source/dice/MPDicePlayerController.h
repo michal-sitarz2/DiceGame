@@ -32,11 +32,20 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_NotifyAnimChallengeComplete();
 
+	UFUNCTION(Server, Reliable)
+	void Server_NotifyAnimCountingComplete();
+
+	UFUNCTION(Server, Reliable)
+	void Server_NotifyAnimDestroyComplete();
+
 	UFUNCTION(Client, Reliable)
 	void Client_ReceiveOwnDice(const TArray<int32>& DiceValues);
 
 	UFUNCTION(Client, Reliable)
 	void Client_NotifyTurnStart();
+
+	UFUNCTION(Client, Reliable)
+	void Client_NotifyTurnRestart();
 
 	UFUNCTION(Client, Reliable)
 	void Client_NotifyTurnEnd();
@@ -47,8 +56,8 @@ public:
 	UFUNCTION(Client, Reliable)
 	void Client_PrepAnimCounting(const TArray<int32>& InAcceptableBets, int32 InBetQuantity);
 
-	UFUNCTION(Server, Reliable)
-	void Server_NotifyAnimCountingComplete();
+	UFUNCTION(Client, Reliable)
+	void Client_StartAnimDestruction(int32 LosingPlayerIdx);
 
 protected:
 	
@@ -66,6 +75,12 @@ protected:
 
 	UFUNCTION()
 	void OnAnimCountingComplete();
+
+	UFUNCTION()
+	void OnAnimDiceDestroyComplete();
+
+	UFUNCTION()
+	void OnAnimUIDestroyComplete();
 
 	TArray<int32> ActiveDiceValues;
 
@@ -92,8 +107,16 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UBetWidget> BetWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> RollPromptWidgetClass;
+
 	UFaceSelectionWidget* ActiveFaceSelectionWidget = nullptr;
 	UMPLeaderboardWidget* ActiveLeaderboardWidget = nullptr;
 	UBetWidget* ActiveBetWidget = nullptr;
+	UUserWidget* ActiveRollPromptWidget = nullptr;
 
+	bool bDiceDestructionComplete = false;
+	bool bUIDestructionComplete = false;
+
+	void CheckDestructionComplete();
 };

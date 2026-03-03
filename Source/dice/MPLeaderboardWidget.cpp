@@ -89,6 +89,74 @@ void UMPLeaderboardWidget::PrepCountingAnimation(const TArray<int32>& InAcceptab
     AcceptableBets = InAcceptableBets;
 }
 
+void UMPLeaderboardWidget::StartDestructionAnimation(int32 InDestroyPlayerIdx)
+{
+    DestroyPlayerIdx = InDestroyPlayerIdx;
+
+    if (UPlayerRowWidget** RowPtr = PlayerRowWidgets.Find(InDestroyPlayerIdx))
+    {
+        UPlayerRowWidget* Row = *RowPtr;
+        TArray<UWidget*> Images = Row->GetDiceIconBox()->GetAllChildren();
+        DestroyImg = Cast<UImage>(Images.Last());
+        if (!DestroyImg)
+        {
+            UE_LOG(LogTemp, Error, TEXT("[UI] Destroy image cast failed"));
+            OnDestructionAnimComplete.Broadcast();
+            return;
+        }
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("[UI] Starting Destruction Animation"));
+
+    // Start animation timer
+    GetWorld()->GetTimerManager().SetTimer(
+        DestroyTimerHandle,
+        this,
+        &UMPLeaderboardWidget::PlayDestructionAnimation,
+        0.016f,
+        true
+    );
+}
+
+void UMPLeaderboardWidget::PlayDestructionAnimation()
+{
+    if (!DestroyImg)
+    {
+        UE_LOG(LogTemp, Error, TEXT("[UI] Destroy Image not found"));
+        GetWorld()->GetTimerManager().ClearTimer(DestroyTimerHandle);
+        OnDestructionAnimComplete.Broadcast();
+        return;
+    }
+    DissolveVal += DissolveStep;
+
+    if (FMath::IsNearlyEqual(DissolveVal, 1.0f, 0.01f))
+    {    
+        if (UPlayerRowWidget** RowPtr = PlayerRowWidgets.Find(DestroyPlayerIdx))
+        {
+            UPlayerRowWidget* Row = *RowPtr;
+            TArray<int32> CurrentDice = Row->GetDisplayedDiceValues();
+            CurrentDice.Pop();
+        }
+
+        DissolveVal = -1.f;
+        DestroyPlayerIdx = -1;
+
+        GetWorld()->GetTimerManager().ClearTimer(DestroyTimerHandle);
+        OnDestructionAnimComplete.Broadcast();
+
+        return;
+    }
+
+    /* Update dice dissolve */
+    FSlateBrush Brush = DestroyImg->GetBrush();
+    UObject* ResourceObject = Brush.GetResourceObject();
+
+    if (UMaterialInstanceDynamic* DynamicMat = Cast<UMaterialInstanceDynamic>(ResourceObject))
+    {
+        DynamicMat->SetScalarParameterValue(FName("Dissolve"), DissolveVal);
+    }
+}
+
 void UMPLeaderboardWidget::StartCountingAnimation()
 {
 	if (!Root || !DiceTexturesData)
@@ -236,7 +304,7 @@ void UMPLeaderboardWidget::PlayCountingAnim()
                     PulseTimerHandle,
                     this,
                     &UMPLeaderboardWidget::PulseImage,
-                    GetWorld()->GetDeltaSeconds(),
+                    0.016f,
                     true
                 );
             }
@@ -381,6 +449,9 @@ void UMPLeaderboardWidget::PulseImage()
     // Apply scale to pulse image
     if (UImage* PulseImg = CurrentAnimIcon->PulseImage)
     {
+        if (!IsValid(PulseImg))
+            return;
+
         float Scale = CurrentAnimIcon->PulseScale;
         PulseImg->SetRenderScale(FVector2D(Scale, Scale));
     }

@@ -81,12 +81,29 @@ void UPlayerRowWidget::UpdateDiceIcons(const TArray<int32>& DiceValues)
         UImage* DiceImage = NewObject<UImage>(this);
         if (!DiceImage) continue;
 
+        
+        UTexture2D* DiceTexture = DiceTexturesData->DiceTextures[DieValue];
+
         FSlateBrush Brush;
-        Brush.SetResourceObject(DiceTexturesData->DiceTextures[DieValue]);
+        if (IconMat)
+        {
+            UMaterialInstanceDynamic* DynamicMaterial = UMaterialInstanceDynamic::Create(IconMat, this);
+            if (DynamicMaterial)
+            {
+                DynamicMaterial->SetTextureParameterValue(FName("DiceTexture"), DiceTexture);
+                Brush.SetResourceObject(DynamicMaterial);
+            }
+        }
+        else
+        {
+            Brush.SetResourceObject(DiceTexture);
+        }
+
         Brush.ImageSize = FVector2D(60.f, 60.f);
         Brush.DrawAs = ESlateBrushDrawType::Image;
         Brush.Tiling = ESlateBrushTileType::NoTile;
         DiceImage->SetBrush(Brush);
+
 
         // Add to horizontal box
         if (UHorizontalBoxSlot* HSlot = DiceIconBox->AddChildToHorizontalBox(DiceImage))

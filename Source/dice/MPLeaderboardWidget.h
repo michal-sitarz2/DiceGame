@@ -56,10 +56,15 @@ public:
 	void UpdatePlayerDice(int32 PlayerIdx, const TArray<int32>& DiceVals);
 	
     void PrepCountingAnimation(const TArray<int32>& InAcceptableBets, UBetWidget* InBetWidget, int32 InMinCount);
+    void StartDestructionAnimation(int32 InDestroyPlayerIdx);
 
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCountingAnimComplete);
 	UPROPERTY(BlueprintAssignable, Category = "Animation")
 	FOnCountingAnimComplete OnCountingAnimComplete;
+
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDestructionAnimComplete);
+    UPROPERTY(BlueprintAssignable, Category = "Animation")
+    FOnDestructionAnimComplete OnDestructionAnimComplete;
 
 protected:
     UPROPERTY(meta = (BindWidget))
@@ -85,6 +90,10 @@ private:
     UFUNCTION()
     void RowRevealReady(UPlayerRowWidget* Row);
     TArray<UPlayerRowWidget*> RevealedRowSet;
+
+    //////////////////////////
+    /** Counting Animation **/
+    //////////////////////////
 
 	UPROPERTY()
 	TMap<int32, UPlayerRowWidget*> PlayerRowWidgets;
@@ -118,4 +127,16 @@ private:
     
     void PulseImage();
     FVector2D RandomBezierControlPoint(const FVector2D& Start, const FVector2D& End);
+
+    ////////////////////////
+    /** Dice Destruction **/
+    ////////////////////////
+
+    void PlayDestructionAnimation();
+
+    UImage* DestroyImg = nullptr;
+    int32 DestroyPlayerIdx = -1;
+    FTimerHandle DestroyTimerHandle;
+    float DissolveVal = -1.f;
+    float DissolveStep = 0.05f;
 };

@@ -80,6 +80,74 @@ void AMPDicePlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AMPDicePlayer, DiceVisuals);
 }
 
+void AMPDicePlayer::StartDestructionAnimation()
+{
+	if (DiceVisuals.Num() == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No dice to remove or invalid count"));
+		OnDiceDestructionComplete.Broadcast();
+		return;
+	}
+
+	// Get the last actor
+	DiceDestroy = DiceVisuals.Pop();
+
+	// Save the Materials
+	Materials.Empty();
+	if (UStaticMeshComponent* Mesh = DiceDestroy->GetComponentByClass<UStaticMeshComponent>())
+	{
+		const int32 MaterialCount = Mesh->GetNumMaterials();
+		for (int32 i = 0; i < MaterialCount; ++i)
+		{
+			if (UMaterialInstanceDynamic* Mat = Mesh->CreateAndSetMaterialInstanceDynamic(i)) 
+				Materials.Add(Mat);
+		}
+	}
+	
+	GetWorld()->GetTimerManager().SetTimer(
+		DestroyTimerHandle,
+		this,
+		&AMPDicePlayer::PlayDestructionAnimation,
+		0.016f,
+		true
+	);
+}
+
+void AMPDicePlayer::PlayDestructionAnimation()
+{
+	if (!DiceDestroy)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[Player] Skipping Destruction - no dice to destroy"));
+		GetWorld()->GetTimerManager().ClearTimer(DestroyTimerHandle);
+		OnDiceDestructionComplete.Broadcast();
+		return;
+	}
+
+	DissolveVal += DissolveStep;
+
+	if (FMath::IsNearlyEqual(DissolveVal, 0.75f, 0.01f))
+	{
+		// Destroy the dice
+		DiceDestroy->Destroy();
+		DiceDestroy = nullptr;
+		DissolveVal = -1.f;
+
+		GetWorld()->GetTimerManager().ClearTimer(DestroyTimerHandle);
+
+		UE_LOG(LogTemp, Error, TEXT("Dice Destroy Broadcasting"));
+		OnDiceDestructionComplete.Broadcast();
+
+		return;
+	}
+
+	// Update the dissolve values
+	for (auto* Mat : Materials) // 3D object
+	{
+		if (!Mat) continue;
+		Mat->SetScalarParameterValue(FName("Dissolve"), DissolveVal);
+	}
+}
+
 void AMPDicePlayer::UpdateDiceCounts(int32 DiceCount)
 {
 	UE_LOG(LogTemp, Warning, TEXT("Updating Dice visuals (from %d to %d)"), DiceCount, DiceVisuals.Num());

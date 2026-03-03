@@ -231,6 +231,23 @@ void AMPDiceGameMode::NextTurn(ETurnModeSelect SelectionMode, int32 SpecificPlay
 		TurnIdx, ActivePlayerIndices.Num());
 }
 
+void AMPDiceGameMode::NotifyRoundRestart() const
+{
+	if (!HasAuthority()) return;
+
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (APlayerController* PC = It->Get())
+		{
+			AMPDicePlayerController* MPPC = Cast<AMPDicePlayerController>(PC);
+
+			if (!MPPC) continue;
+
+			MPPC->Client_NotifyTurnRestart();
+		}
+	}
+}
+
 void AMPDiceGameMode::NotifyPlayerTurn(int32 PlayerIdx) const
 {
 	if (!HasAuthority()) return;
@@ -242,7 +259,7 @@ void AMPDiceGameMode::NotifyPlayerTurn(int32 PlayerIdx) const
 			AMPDicePlayerState* PS = PC->GetPlayerState<AMPDicePlayerState>();
 			AMPDicePlayerController* MPPC = Cast<AMPDicePlayerController>(PC);
 
-			if (!PS || !MPPC) return;
+			if (!PS || !MPPC) continue;
 
 			// Notify which player is the current player
 			if (PS->PlayerIdx == PlayerIdx) // This is the active player - show their UI
@@ -434,43 +451,6 @@ int AMPDiceGameMode::CountCurrentBet() const
 	return DiceCount;
 }
 
-void AMPDiceGameMode::EndOfRound()
-{
-	AMPDiceGameState* MPGameState = GetGameState<AMPDiceGameState>();
-	if (!MPGameState) return;
-
-	//// TODO: Check if enough players! (END GAME)
-	//int32 PlayerCounter = 0;
-	//for (auto& Player : MPGameState->PlayerArray)
-	//{
-	//	AMPDicePlayerState* MPPlayer = Cast<AMPDicePlayerState>(Player);
-	//	if (MPPlayer->DiceCount >= 0) PlayerCounter++;
-
-	//	if (PlayerCounter > 1) break;
-	//}
-
-	//if (PlayerCounter <= 1)
-	//{
-	//	MPGameState->Phase = ETurnPhase::Finished;
-	//	return;
-	//}
-
-
-
-
-
-
-	//HideDice();
-
-	//// Reset bet values
-	//Loser = nullptr;
-	//MPGameState->CurrentBet.Reset();
-	//MPGameState->BroadcastBetChanged();
-	//MPGameState->Phase = ETurnPhase::Rolling;
-
-	//NotifyPlayerTurn(INDEX_NONE); // Hides UI for all players
-}
-
 void AMPDiceGameMode::OnAnimChallengeComplete(APlayerController* InPlayerController)
 {
 	if (!CheckAnimComplete(InPlayerController)) return;
@@ -496,31 +476,18 @@ void AMPDiceGameMode::OnAnimChallengeComplete(APlayerController* InPlayerControl
 
 void AMPDiceGameMode::DestroyDice()
 {
+	if (!HasAuthority()) return;
+
 	AMPDiceGameState* GS = GetGameState<AMPDiceGameState>();
 	if (!GS) return;
 
-
-	UE_LOG(LogTemp, Error, TEXT("TODO!! DestroyDice"));
-
-
-	/****************** TODO **************************/
-	//// TODO: Destroy UI Dice Animation
-
-	//AMPDicePlayer* LoserDicePawn = Loser->GetDicePawn();
-	//if (!LoserDicePawn) return;
-
-	//// Removes the dice for the losing player
-	//// TODO: Destruction Animation
-	//LoserDicePawn->UpdateDiceCounts(Loser->DiceCount);
-
-
-	/*for (APlayerState* Player : GS->PlayerArray)
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
-		AMPDicePlayerState* MPPlayer = Cast<AMPDicePlayerState>(Player);
-		if (!MPPlayer) continue;
-
-		MPPlayer->DestroyUIDice();
-	}*/
+		AMPDicePlayerController* PC = Cast<AMPDicePlayerController>(It->Get());
+		if (!PC) return;
+		
+		PC->Client_StartAnimDestruction(Loser->PlayerIdx);
+	}
 }
 
 void AMPDiceGameMode::OnAnimCountingComplete(APlayerController* InPlayerController)
@@ -528,16 +495,22 @@ void AMPDiceGameMode::OnAnimCountingComplete(APlayerController* InPlayerControll
 	if (!CheckAnimComplete(InPlayerController)) return;
 	UE_LOG(LogTemp, Warning, TEXT("[GameMode] Counting Animation Complete"));
 	
-	EndOfRound();
-	// DestroyDice();
+	DestroyDice();
 }
 
 
 void AMPDiceGameMode::OnAnimDestroyComplete(APlayerController* InPlayerController)
 {
+	// UE_LOG("[GameMode] Destroy Animations Complete");
+
 	if (!CheckAnimComplete(InPlayerController)) return;
-	UE_LOG(LogTemp, Warning, TEXT("[GameMode] Counting Animation Complete"));
+	UE_LOG(LogTemp, Warning, TEXT("[GameMode] Destroy Animations Complete"));
 	
+	// TODO: check
+	AMPDicePlayer* LoserDicePawn = Loser->GetDicePawn();
+	if (!LoserDicePawn) return;
+	LoserDicePawn->UpdateDiceCounts(Loser->DiceCount);
+
 	EndOfRound();
 }
 
@@ -551,4 +524,40 @@ bool AMPDiceGameMode::CheckAnimComplete(APlayerController* InPlayerController)
 	CompletedAnimationPlayers.Empty();
 	return true;
 
+}
+
+void AMPDiceGameMode::EndOfRound()
+{
+	AMPDiceGameState* MPGameState = GetGameState<AMPDiceGameState>();
+	if (!MPGameState) return;
+
+	UE_LOG(LogTemp, Warning, TEXT("[GameMode] End of Round"));
+
+	//// TODO: END GAME
+	//int32 PlayerCounter = 0;
+	//for (auto& Player : MPGameState->PlayerArray)
+	//{
+	//	AMPDicePlayerState* MPPlayer = Cast<AMPDicePlayerState>(Player);
+	//	if (MPPlayer->DiceCount >= 0) PlayerCounter++;
+
+	//	if (PlayerCounter > 1) break;
+	//}
+
+	//if (PlayerCounter <= 1)
+	//{
+	//	MPGameState->Phase = ETurnPhase::Finished;
+	//	return;
+	//}
+
+
+	HideDice();
+
+	// Reset bet values
+	Loser = nullptr;
+	MPGameState->CurrentBet.Reset();
+	MPGameState->BroadcastBetChanged();
+	MPGameState->Phase = ETurnPhase::Rolling;
+
+	NotifyRoundRestart();
+	NotifyPlayerTurn(INDEX_NONE); // Hides UI for all players
 }

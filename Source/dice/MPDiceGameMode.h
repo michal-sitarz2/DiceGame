@@ -59,6 +59,7 @@ private:
 
 	int CountCurrentBet() const;
 	void NotifyPlayerTurn(int32 PlayerIdx) const;
+	void NotifyRoundRestart() const;
 	bool IsValidBet(int32 Quantity, int32 Face);
 	bool CheckAnimComplete(APlayerController* InPlayerController);
 

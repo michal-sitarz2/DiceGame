@@ -29,6 +29,10 @@ public:
     void UpdateDiceIcons(const TArray<int32>& DiceValues);
     void SetupHandlers(AMPDicePlayerState* PS);
 
+    /* Material for the Dice Icons */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ledaerboard")
+    UMaterialInterface* IconMat;
+
     DECLARE_MULTICAST_DELEGATE_OneParam(FOnRowDiceRevealed, UPlayerRowWidget*);
     FOnRowDiceRevealed OnRowDiceRevealed;
 
