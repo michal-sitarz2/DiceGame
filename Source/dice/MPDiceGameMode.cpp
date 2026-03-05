@@ -22,7 +22,7 @@ void AMPDiceGameMode::PostLogin(APlayerController* NewPlayer)
 		UE_LOG(LogTemp, Warning, TEXT("Player %d joined"), NewPlayerState->PlayerIdx);
 	}
 
-	// TODO: GameStart when
+	// TODO: Lobby
 	if (GameState->PlayerArray.Num() >= 2) StartGame();
 }
 
@@ -33,7 +33,7 @@ void AMPDiceGameMode::StartGame()
 	if (AMPDiceGameState* MPGameState = GetGameState<AMPDiceGameState>())
 	{
 		MPGameState->Phase = ETurnPhase::Rolling;
-		UE_LOG(LogTemp, Warning, TEXT("Game Started"));
+		UE_LOG(LogTemp, Warning, TEXT("== Start =="));
 	}
 }
 
@@ -44,7 +44,7 @@ void AMPDiceGameMode::PlayerRollComplete(APlayerController* PlayerController)
 	if (AMPDicePlayerState* MPPlayerState = PlayerController->GetPlayerState<AMPDicePlayerState>())
 	{
 		MPPlayerState->bRolled = true;
-		UE_LOG(LogTemp, Warning, TEXT("Player %d roll complete"), MPPlayerState->PlayerIdx);
+		UE_LOG(LogTemp, Warning, TEXT("Player %d rolled"), MPPlayerState->PlayerIdx);
 
 		// Check if everyone is done
 		CheckStartTurn();
@@ -62,14 +62,14 @@ void AMPDiceGameMode::CheckStartTurn()
 		if (!MPPlayer->bRolled) return;
 	}
 
-	// TODO: Broadcast here? Change to turn start?
+	// TODO: Broadcast here?
 	if (!MPGameState->bGameStarted)
 	{
 		MPGameState->bGameStarted = true;
 		MPGameState->BroadcastGameStarted();
 	}
 
-	// TODO: Check if enough players!!! (LOBBY)
+	// TODO: Check if enough players
 
 	StartTurn();
 }
@@ -319,7 +319,6 @@ void AMPDiceGameMode::RevealDice()
 		AMPDicePlayerState* MPPlayer = PC->GetPlayerState<AMPDicePlayerState>();
 		if (!MPPlayer) continue;
 
-		// TODO:
 		TArray<int32> AcceptableBets;
 		AcceptableBets.Add(MPGameState->CurrentBet.Face);
 		PC->Client_PrepAnimCounting(AcceptableBets, MPGameState->CurrentBet.Quantity);
@@ -338,7 +337,15 @@ void AMPDiceGameMode::HideDice()
 		AMPDicePlayerState* MPPlayer = Cast<AMPDicePlayerState>(Player);
 		if (!MPPlayer) continue;
 
+		APlayerController* DicePC = Cast<APlayerController>(MPPlayer->GetOwner());
+		if (!DicePC) return;
+		
 		MPPlayer->HideDice();
+		
+		if (AMPDicePlayerController* MPDicePC = Cast<AMPDicePlayerController>(DicePC))
+		{
+			MPDicePC->Client_CleanupUI();
+		}
 	}
 }
 
@@ -355,9 +362,7 @@ void AMPDiceGameMode::DiceToOwner(AMPDicePlayerState* PlayerState) const
 	}
 }
 
-// TODO: PERUDO (jokers) -> switch game modes?
 // TODO: Extra Rules
-// TODO: Get Acceptable Bets
 bool AMPDiceGameMode::IsValidBet(int32 Quantity, int32 Face)
 {
 	AMPDiceGameState* MPGameState = GetGameState<AMPDiceGameState>();
@@ -471,8 +476,6 @@ void AMPDiceGameMode::OnAnimChallengeComplete(APlayerController* InPlayerControl
 	Loser->DiceCount = FMath::Max(0, Loser->DiceCount - 1);
 	Challenger = nullptr;
 	NextPlayer = Loser; 
-	
-	UE_LOG(LogTemp, Error, TEXT("[End of Round] Loser IDX: %d"), Loser->PlayerIdx);
 
 	RevealDice();
 }
@@ -483,8 +486,6 @@ void AMPDiceGameMode::DestroyDice()
 
 	AMPDiceGameState* GS = GetGameState<AMPDiceGameState>();
 	if (!GS) return;
-
-	UE_LOG(LogTemp, Error, TEXT("[Destroy Dice] Loser IDX: %d"), Loser->PlayerIdx);
 
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
@@ -511,7 +512,6 @@ void AMPDiceGameMode::OnAnimDestroyComplete(APlayerController* InPlayerControlle
 	if (!CheckAnimComplete(InPlayerController)) return;
 	UE_LOG(LogTemp, Warning, TEXT("[GameMode] Destroy Animations Complete"));
 	
-	// TODO: check
 	AMPDicePlayer* LoserDicePawn = Loser->GetDicePawn();
 	if (!LoserDicePawn) return;
 	LoserDicePawn->UpdateDiceCounts(Loser->DiceCount);

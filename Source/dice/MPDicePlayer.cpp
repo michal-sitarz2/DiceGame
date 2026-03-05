@@ -9,7 +9,6 @@
 #include "MPDicePlayerState.h"
 #include "Net/UnrealNetwork.h"
 
-// TODO: Sets default values
 AMPDicePlayer::AMPDicePlayer()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -21,7 +20,7 @@ AMPDicePlayer::AMPDicePlayer()
 	// Camera setup
 	PlayerCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("PlayerCamera"));
 	PlayerCamera->SetupAttachment(Root);
-	PlayerCamera->SetRelativeLocation(FVector(-125.f, 0.f, 140.f));
+	PlayerCamera->SetRelativeLocation(FVector(-125.f, 0.f, 50.f));
 	PlayerCamera->SetWorldRotation(FRotator(-40.f, 0.f, 0.f));
 
 	// Spotlight setup
@@ -152,7 +151,6 @@ void AMPDicePlayer::UpdateDiceCounts(int32 DiceCount)
 {
 	UE_LOG(LogTemp, Warning, TEXT("Updating Dice visuals (from %d to %d)"), DiceCount, DiceVisuals.Num());
 
-	// TODO: Animation
 	/* Remove Extra Dice */
 	while (DiceVisuals.Num() > DiceCount)
 	{
@@ -170,6 +168,7 @@ void AMPDicePlayer::UpdateDiceCounts(int32 DiceCount)
 		const int32 DiceIdx = DiceVisuals.Num();
 
 		FVector SpawnLocation = GetActorLocation();
+		SpawnLocation.X = 50.f;
 		SpawnLocation.Y -= 50.f - (DiceIdx * 25.f);
 		SpawnLocation.Z = 10.f;
 
@@ -189,9 +188,6 @@ void AMPDicePlayer::UpdateDiceCounts(int32 DiceCount)
 
 void AMPDicePlayer::UpdateDiceVisuals(const TArray<int32>& DiceVals)
 {
-	// TODO: Animation
-	
-
 	if (DiceVals.Num() != DiceVisuals.Num())
 	{
 		UE_LOG(LogTemp, Error, TEXT("Failed to Update Dice Visuals"));

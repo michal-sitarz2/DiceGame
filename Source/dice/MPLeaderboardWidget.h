@@ -59,6 +59,8 @@ public:
 	
     void PrepCountingAnimation(const TArray<int32>& InAcceptableBets, UBetWidget* InBetWidget, int32 InMinCount);
     void StartDestructionAnimation(int32 InDestroyPlayerIdx);
+    void CleanupAnimation();
+
 
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCountingAnimComplete);
 	UPROPERTY(BlueprintAssignable, Category = "Animation")

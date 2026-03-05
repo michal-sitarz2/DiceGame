@@ -20,7 +20,6 @@ void ADiceGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// TODO - Multiplayer: If InitPlayerNum == 0, Unreal will crush
 	if (InitPlayerNum < 2) UE_LOG(LogTemp, Error, TEXT("Not enough players (min 2)"));
 
 	if (!PlayerClass)
@@ -64,7 +63,6 @@ void ADiceGameMode::BeginPlay()
 	ToggleNextPlayer(CurrentPlayer, true);
 	
 	/* Display the currenet bet */
-	// TODO: add to all players?
 	APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
 	BetWidget = CreateWidget<UBetWidget>(PlayerController, BetWidgetClass);
 	if (BetWidget) {

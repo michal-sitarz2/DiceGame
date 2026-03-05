@@ -17,6 +17,8 @@ void UMPLeaderboardWidget::NativeDestruct()
         GetWorld()->GetTimerManager().ClearTimer(CountTimerHandle);
         GetWorld()->GetTimerManager().ClearTimer(PulseTimerHandle);
     }
+
+    CleanupAnimation();
 }
 
 void UMPLeaderboardWidget::SetupPlayers()
@@ -127,6 +129,29 @@ void UMPLeaderboardWidget::StartDestructionAnimation(int32 InDestroyPlayerIdx)
         0.016f,
         true
     );
+}
+
+void UMPLeaderboardWidget::CleanupAnimation()
+{
+    auto SafeRemove = [](UWidget* Widget)
+    {
+        if (IsValid(Widget) && Widget->GetParent())
+        {
+            Widget->RemoveFromParent();
+        }
+
+        Widget = nullptr;
+    };
+
+    for (FCountingAnimData& AnimData : ActiveAnimIcons)
+    {
+        SafeRemove(AnimData.FlyImage);
+        SafeRemove(AnimData.Glow);
+        SafeRemove(AnimData.PulseImage);
+    }
+
+    ActiveAnimIcons.Empty();
+    CurrentAnimIconIdx = INDEX_NONE;
 }
 
 void UMPLeaderboardWidget::PlayDestructionAnimation()
@@ -279,14 +304,6 @@ void UMPLeaderboardWidget::PlayCountingAnim()
 {
 	if (CountingState != EAnimState::Running)
 	{
-        // Animation Data Clean Up
-        for (FCountingAnimData& AnimData : ActiveAnimIcons)
-        {
-            if (AnimData.Glow) AnimData.Glow->RemoveFromParent();
-            if (AnimData.FlyImage) AnimData.FlyImage->RemoveFromParent();
-        }
-        ActiveAnimIcons.Empty();
-
 		GetWorld()->GetTimerManager().ClearTimer(CountTimerHandle);
 		OnCountingAnimComplete.Broadcast();
 	}
@@ -333,9 +350,6 @@ void UMPLeaderboardWidget::PlayCountingAnim()
             {
                 ImageSlot->SetPosition(AnimData.Start);
                 ImageSlot->SetSize(FVector2D(30, 30));
-            
-            
-                UE_LOG(LogTemp, Warning, TEXT("Star: (%f, %f)"), AnimData.Start.X, AnimData.Start.Y);
             }
 
 

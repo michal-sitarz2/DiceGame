@@ -29,11 +29,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Widget")
 	void ResetCurrentBetText();
 
-
-	/******************* TODO *******************/
-	// void ChallengeStart(EAnimState& InChallengeState);
-	// void ChallengeStop();
-
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnChallengeAnimComplete);
 
 	UPROPERTY(BlueprintAssignable, Category = "Animation")

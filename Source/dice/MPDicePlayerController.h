@@ -57,6 +57,9 @@ public:
 	void Client_PrepAnimCounting(const TArray<int32>& InAcceptableBets, int32 InBetQuantity);
 
 	UFUNCTION(Client, Reliable)
+	void Client_CleanupUI();
+
+	UFUNCTION(Client, Reliable)
 	void Client_StartAnimDestruction(int32 LosingPlayerIdx);
 
 protected:

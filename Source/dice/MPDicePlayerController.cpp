@@ -184,7 +184,7 @@ void AMPDicePlayerController::OnAnimCountingComplete()
 
 void AMPDicePlayerController::OnAnimDiceDestroyComplete()
 {
-    UE_LOG(LogTemp, Error, TEXT("Player %d: Dice Destroy Complete"), GetPlayerIdx());
+    UE_LOG(LogTemp, Warning, TEXT("Player %d: Dice Destroy Complete"), GetPlayerIdx());
 
     bDiceDestructionComplete = true;
     CheckDestructionComplete();
@@ -192,7 +192,7 @@ void AMPDicePlayerController::OnAnimDiceDestroyComplete()
 
 void AMPDicePlayerController::OnAnimUIDestroyComplete()
 {
-    UE_LOG(LogTemp, Error, TEXT("Player %d: UI Destroy Complete"), GetPlayerIdx());
+    UE_LOG(LogTemp, Warning, TEXT("Player %d: UI Destroy Complete"), GetPlayerIdx());
     
     bUIDestructionComplete = true;
     CheckDestructionComplete();
@@ -284,6 +284,14 @@ void AMPDicePlayerController::Client_StartAnimDestruction_Implementation(int32 L
     CheckDestructionComplete();
 }
 
+void AMPDicePlayerController::Client_CleanupUI_Implementation()
+{
+    if (ActiveLeaderboardWidget)
+    {
+        ActiveLeaderboardWidget->CleanupAnimation();
+    }
+}
+
 /****************************/
 /** Server: Bet Submission **/
 /****************************/
@@ -325,7 +333,6 @@ void AMPDicePlayerController::Server_RequestChallenge_Implementation()
     AMPDiceGameState* MPGameState = GetWorld()->GetGameState<AMPDiceGameState>();
     if (!MPGameState && MPGameState->Phase != ETurnPhase::Playing) return;
 
-    // TODO:
     MPGameMode->OnPlayerChallenge(this);
 }
 
@@ -368,7 +375,7 @@ void AMPDicePlayerController::Client_ReceiveOwnDice_Implementation(const TArray<
         DicePawn->UpdateDiceVisuals(ActiveDiceValues);
 
 
-        // TODO: Animation
+        // TODO: Rolling Animation
         FTimerHandle TimerHandle;
         GetWorldTimerManager().SetTimer(
             TimerHandle,
@@ -420,7 +427,6 @@ void AMPDicePlayerController::Client_NotifyTurnRestart_Implementation()
     }
 }
 
-// TODO: Add boolean bActive flag?
 void AMPDicePlayerController::Client_NotifyTurnStart_Implementation()
 {
     bIsActive = true;
