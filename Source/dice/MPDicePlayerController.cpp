@@ -409,6 +409,11 @@ void AMPDicePlayerController::Server_NotifyRollComplete_Implementation()
 
 void AMPDicePlayerController::Client_NotifyTurnRestart_Implementation()
 {
+    if (AMPDicePlayerState* MPPlayerState = GetPlayerState<AMPDicePlayerState>())
+    {
+        MPPlayerState->bRolled = false;
+    }
+
     if (ActiveRollPromptWidget)
     {
         ActiveRollPromptWidget->SetVisibility(ESlateVisibility::Visible);

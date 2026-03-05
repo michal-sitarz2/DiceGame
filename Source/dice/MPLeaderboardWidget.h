@@ -52,6 +52,8 @@ class DICE_API UMPLeaderboardWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+    virtual void NativeDestruct() override;
+
 	void SetupPlayers();
 	void UpdatePlayerDice(int32 PlayerIdx, const TArray<int32>& DiceVals);
 	
@@ -99,7 +101,8 @@ private:
 	TMap<int32, UPlayerRowWidget*> PlayerRowWidgets;
 
     TArray<FCountingAnimData> ActiveAnimIcons;
-    FCountingAnimData* CurrentAnimIcon = nullptr;
+    //FCountingAnimData* CurrentAnimIcon = nullptr;
+    int32 CurrentAnimIconIdx = INDEX_NONE;
 
     UPROPERTY()
     UBetWidget* BetWidget = nullptr;

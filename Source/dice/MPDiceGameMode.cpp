@@ -464,13 +464,16 @@ void AMPDiceGameMode::OnAnimChallengeComplete(APlayerController* InPlayerControl
 
 	AMPDicePlayerState* BettingPlayer = Cast<AMPDicePlayerState>(MPGameState->CurrentBet.BettingPlayer);
 	Loser = (DiceCount >= MPGameState->CurrentBet.Quantity) 
-		? BettingPlayer : Challenger->GetPlayerState<AMPDicePlayerState>();
+		? Challenger->GetPlayerState<AMPDicePlayerState>() : BettingPlayer;
 
-	Loser->DiceCount--;
+	if (!Loser) return;
+
+	Loser->DiceCount = FMath::Max(0, Loser->DiceCount - 1);
 	Challenger = nullptr;
 	NextPlayer = Loser; 
 	
-	// TODO: Separate Reveal and Counting Animation?
+	UE_LOG(LogTemp, Error, TEXT("[End of Round] Loser IDX: %d"), Loser->PlayerIdx);
+
 	RevealDice();
 }
 
@@ -480,6 +483,8 @@ void AMPDiceGameMode::DestroyDice()
 
 	AMPDiceGameState* GS = GetGameState<AMPDiceGameState>();
 	if (!GS) return;
+
+	UE_LOG(LogTemp, Error, TEXT("[Destroy Dice] Loser IDX: %d"), Loser->PlayerIdx);
 
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{

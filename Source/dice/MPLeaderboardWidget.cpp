@@ -8,6 +8,17 @@
 #include "MPDicePlayerState.h"
 
 
+void UMPLeaderboardWidget::NativeDestruct()
+{
+    Super::NativeDestruct();
+
+    if (GetWorld())
+    {
+        GetWorld()->GetTimerManager().ClearTimer(CountTimerHandle);
+        GetWorld()->GetTimerManager().ClearTimer(PulseTimerHandle);
+    }
+}
+
 void UMPLeaderboardWidget::SetupPlayers()
 {
 	if (!LeaderboardList) return;
@@ -298,7 +309,8 @@ void UMPLeaderboardWidget::PlayCountingAnim()
             if (AnimData.Pulse == EAnimState::NotStarted)
             {
                 AnimData.Pulse = EAnimState::Running;
-                CurrentAnimIcon = &AnimData;
+                // CurrentAnimIcon = &AnimData;
+                CurrentAnimIconIdx = &AnimData - ActiveAnimIcons.GetData();
 
                 GetWorld()->GetTimerManager().SetTimer(
                     PulseTimerHandle,
@@ -409,51 +421,74 @@ void UMPLeaderboardWidget::PlayCountingAnim()
     }
 
     // Check if all animations finished
-    if (bAllFinished) CountingState = EAnimState::Finished;
+    if (bAllFinished)
+    {
+        CountingState = EAnimState::Finished;
+        //CurrentAnimIcon = nullptr;
+        CurrentAnimIconIdx = INDEX_NONE;
+        if (GetWorld())
+        {
+            GetWorld()->GetTimerManager().ClearTimer(PulseTimerHandle);
+        }
+    }
 }
 
 void UMPLeaderboardWidget::PulseImage()
 {
-    if (!CurrentAnimIcon || CurrentAnimIcon->Pulse == EAnimState::Finished)
+    if (!GetWorld() || !IsValid(this))
+    {
+        return;
+    }
+
+    if (!ActiveAnimIcons.IsValidIndex(CurrentAnimIconIdx))
     {
         GetWorld()->GetTimerManager().ClearTimer(PulseTimerHandle);
         return;
     }
 
+    FCountingAnimData& AnimData = ActiveAnimIcons[CurrentAnimIconIdx];
+
+    if (AnimData.Pulse == EAnimState::Finished)
+    {
+        GetWorld()->GetTimerManager().ClearTimer(PulseTimerHandle);
+        CurrentAnimIconIdx = INDEX_NONE;
+        return;
+    }
+
     float DeltaTime = GetWorld()->GetDeltaSeconds();
 
-    if (CurrentAnimIcon->bPulseScale)
+    if (AnimData.bPulseScale)
     {
         float MaxScale = 1.5f;
-        CurrentAnimIcon->PulseScale += DeltaTime * PulseSpeed;
+        AnimData.PulseScale += DeltaTime * PulseSpeed;
 
-        if (CurrentAnimIcon->PulseScale >= MaxScale)
+        if (AnimData.PulseScale >= MaxScale)
         {
-            CurrentAnimIcon->PulseScale = MaxScale;
-            CurrentAnimIcon->bPulseScale = false;
+            AnimData.PulseScale = MaxScale;
+            AnimData.bPulseScale = false;
         }
     }
     else
     {
         float MinScale = 1.0f;
-        CurrentAnimIcon->PulseScale -= DeltaTime * PulseSpeed;
+        AnimData.PulseScale -= DeltaTime * PulseSpeed;
 
-        if (CurrentAnimIcon->PulseScale <= MinScale)
+        if (AnimData.PulseScale <= MinScale)
         {
-            CurrentAnimIcon->PulseScale = MinScale;
-            CurrentAnimIcon->bPulseScale = true;
-            CurrentAnimIcon->Pulse = EAnimState::Finished;
+            AnimData.PulseScale = MinScale;
+            AnimData.bPulseScale = true;
+            AnimData.Pulse = EAnimState::Finished;
         }
     }
 
     // Apply scale to pulse image
-    if (UImage* PulseImg = CurrentAnimIcon->PulseImage)
+    if (UImage* PulseImg = AnimData.PulseImage)
     {
-        if (!IsValid(PulseImg))
-            return;
-
-        float Scale = CurrentAnimIcon->PulseScale;
-        PulseImg->SetRenderScale(FVector2D(Scale, Scale));
+        if (IsValid(PulseImg))
+        {
+            float Scale = AnimData.PulseScale;
+            PulseImg->SetRenderScale(FVector2D(Scale, Scale));
+        }
     }
 }
 
