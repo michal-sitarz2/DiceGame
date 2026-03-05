@@ -28,6 +28,7 @@ public:
 
 	void StartGame();
 	void StartTurn();
+	bool CheckEndGame();
 	void NextTurn(ETurnModeSelect SelectionMode = ETurnModeSelect::Next, int32 SpecificPlayerIdx = -1);
 
 	/* Randomly generate new die faces */

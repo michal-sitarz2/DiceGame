@@ -16,6 +16,8 @@ void AMPDiceGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 
+	// TODO: Check if the player joined after the game started
+
 	if (AMPDicePlayerState* NewPlayerState = NewPlayer->GetPlayerState<AMPDicePlayerState>())
 	{
 		NewPlayerState->PlayerIdx = GameState->PlayerArray.Num() - 1;
@@ -59,7 +61,9 @@ void AMPDiceGameMode::CheckStartTurn()
 	for (auto& Player : MPGameState->PlayerArray)
 	{
 		AMPDicePlayerState* MPPlayer = Cast<AMPDicePlayerState>(Player);
-		if (!MPPlayer->bRolled) return;
+		if (!MPPlayer) continue;
+		if (MPPlayer->DiceCount <= 0) continue; // Skip players that are out of the game
+		if (!MPPlayer->bRolled) return; // A player hasn't rolled
 	}
 
 	// TODO: Broadcast here?
@@ -101,6 +105,35 @@ void AMPDiceGameMode::StartTurn()
 	}
 }
 
+bool AMPDiceGameMode::CheckEndGame()
+{
+	AMPDiceGameState* MPGameState = GetGameState<AMPDiceGameState>();
+	if (!MPGameState) return false;
+
+	int32 ActivePlayers = 0;
+	AMPDicePlayerState* LastStanding = nullptr;
+	for (auto& Player : MPGameState->PlayerArray)
+	{
+		AMPDicePlayerState* MPPlayer = Cast<AMPDicePlayerState>(Player);
+		if (MPPlayer && MPPlayer->DiceCount > 0)
+		{
+			ActivePlayers++;
+			LastStanding = MPPlayer;
+		}
+	}
+
+	if (ActivePlayers <= 1)
+	{
+		MPGameState->Phase = ETurnPhase::Finished;
+		UE_LOG(LogTemp, Warning, TEXT("[GameMode] Game Over! Winner: Player %d"),
+			LastStanding ? LastStanding->PlayerIdx : -1);
+
+		return true;
+	}
+
+	return false;
+}
+
 void AMPDiceGameMode::NextTurn(ETurnModeSelect SelectionMode, int32 SpecificPlayerIdx)
 {
 	if (!HasAuthority()) return;
@@ -117,15 +150,15 @@ void AMPDiceGameMode::NextTurn(ETurnModeSelect SelectionMode, int32 SpecificPlay
 
 	// Helper lambda to check if a player is valid and active
 	auto IsPlayerInPlay = [](APlayerState* PS) -> bool
-		{
-			if (!PS) return false;
+	{
+		if (!PS) return false;
 
-			AMPDicePlayerState* DicePS = Cast<AMPDicePlayerState>(PS);
-			if (!DicePS) return false;
+		AMPDicePlayerState* DicePS = Cast<AMPDicePlayerState>(PS);
+		if (!DicePS) return false;
 
-			// Check if player is still in the game
-			return DicePS->DiceCount > 0;
-		};
+		// Check if player is still in the game
+		return DicePS->DiceCount > 0;
+	};
 
 	// Get list of active player indices
 	TArray<int32> ActivePlayerIndices;
@@ -475,7 +508,7 @@ void AMPDiceGameMode::OnAnimChallengeComplete(APlayerController* InPlayerControl
 
 	Loser->DiceCount = FMath::Max(0, Loser->DiceCount - 1);
 	Challenger = nullptr;
-	NextPlayer = Loser; 
+	NextPlayer = (Loser->DiceCount > 0) ? Loser : nullptr;
 
 	RevealDice();
 }
@@ -537,25 +570,13 @@ void AMPDiceGameMode::EndOfRound()
 	if (!MPGameState) return;
 
 	UE_LOG(LogTemp, Warning, TEXT("[GameMode] End of Round"));
-
-	//// TODO: END GAME
-	//int32 PlayerCounter = 0;
-	//for (auto& Player : MPGameState->PlayerArray)
-	//{
-	//	AMPDicePlayerState* MPPlayer = Cast<AMPDicePlayerState>(Player);
-	//	if (MPPlayer->DiceCount >= 0) PlayerCounter++;
-
-	//	if (PlayerCounter > 1) break;
-	//}
-
-	//if (PlayerCounter <= 1)
-	//{
-	//	MPGameState->Phase = ETurnPhase::Finished;
-	//	return;
-	//}
-
-
 	HideDice();
+
+	// Check if the game ended
+	if (CheckEndGame())
+	{
+		return;
+	}
 
 	// Reset bet values
 	Loser = nullptr;
